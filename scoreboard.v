@@ -379,14 +379,17 @@ module scoreboard(
             reg_status[raddr+1'b1] <= reg_status[raddr+1'b1];
         end
         else begin
-            if (valid_inst[iptr[0]] & writeback[iptr[0]]) begin
-                reg_status[inst_status[iptr[0]][`REG3]] <= `NULL;
-            end
-            if (valid_inst[iptr[2]] & writeback[iptr[2]]) begin
-                reg_status[inst_status[iptr[2]][`REG3]] <= `NULL;
-            end
-            if (valid_inst[iptr[3]] & writeback[iptr[3]]) begin
-                reg_status[inst_status[iptr[3]][`REG3]] <= `NULL;
+            // if (valid_inst[iptr[0]] & writeback[iptr[0]]) begin
+            //     reg_status[inst_status[iptr[0]][`REG3]] <= `NULL;
+            // end
+            // if (valid_inst[iptr[2]] & writeback[iptr[2]]) begin
+            //     reg_status[inst_status[iptr[2]][`REG3]] <= `NULL;
+            // end
+            // if (valid_inst[iptr[3]] & writeback[iptr[3]]) begin
+            //     reg_status[inst_status[iptr[3]][`REG3]] <= `NULL;
+            // end
+            if (valid_inst[raddr] & writeback[raddr]) begin
+                reg_status[inst_status[raddr][`REG3]] <= `NULL;
             end
             if (dispatch_ok) begin
                 reg_status[inst_status[dptr][`REG3]] <= inst_status[dptr][`REG3]==0 ? `NULL : inst_status[dptr][`FU];
