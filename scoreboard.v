@@ -72,7 +72,10 @@ module scoreboard(
         if (!resetn) begin
             wptr <= 0;
         end
-        else if(!full & !br_bus[32] & inst1_valid) begin
+        else if (br_bus[32]) begin
+            wptr <= rptr + 2;
+        end
+        else if (!full & !br_bus[32] & inst1_valid) begin
             wptr <= wptr_next;
         end
     end
@@ -106,6 +109,12 @@ module scoreboard(
     always @ (posedge clk) begin
         if (!resetn) begin
             dptr <= 0;
+        end
+        else if (br_bus[32]) begin
+            dptr <= rptr[3:0] + 2'd2;
+        end
+        else if (dispatch[dptr]) begin
+            dptr <= dptr + 1'b1;
         end
         else if (valid_inst[dptr]&~busy[inst_status[dptr][`FU]]&reg_status[inst_status[dptr][`REG3]]==`NULL) begin
             dptr <= dptr + 1'b1;
@@ -146,6 +155,10 @@ module scoreboard(
                 writeback[waddr] <= 1'b0;
                 inst_status[waddr] <= {wptr, inst1};
             end
+            else if (br_bus[32]) begin
+                valid_inst <= 16'b0 ;
+                valid_inst[raddr+1'b1] <= 1'b1;
+            end
             if (valid_inst[dptr]&~busy[inst_status[dptr][`FU]]&reg_status[inst_status[dptr][`REG3]]==`NULL) begin
                 dispatch[dptr] <= 1'b1;
             end
@@ -178,6 +191,8 @@ module scoreboard(
             if (valid_inst[iptr[5]] & wb_ok[5] & execute[iptr[5]]) writeback[iptr[5]] <= 1'b1;
             if (valid_inst[iptr[6]] & wb_ok[6] & execute[iptr[6]]) writeback[iptr[6]] <= 1'b1;
             if (valid_inst[iptr[7]] & wb_ok[7] & execute[iptr[7]]) writeback[iptr[7]] <= 1'b1;
+
+            if (retire_en[0]) valid_inst[raddr] <= 1'b0;
         end
     end
 
@@ -502,6 +517,7 @@ module scoreboard(
         else begin
             if (cb_we[0]) {rf_we_r[iptr[0]], cb[iptr[0]]} <= {rf_we[0], wdata[0]};
             if (cb_we[2]) {br_e_r[iptr[2]], rf_we_r[iptr[0]], cb[iptr[2]], cb_extra[iptr[2]]} <= {br_e, rf_we[2], wdata[2], extra_wdata[2]};
+            if (br_bus[32]) br_e_r <= 16'b0;
         end
     end
 

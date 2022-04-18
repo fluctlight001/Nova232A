@@ -222,7 +222,7 @@ module decoder (
     };
 
     wire rf_we;
-    wire [4:0] rf_waddr;
+    wire [5:0] rf_waddr;
     wire [3:0] sel_rf_dst;
     wire [4:0] sel_alu_imm;
     wire [31:0] imm_o;
@@ -297,8 +297,8 @@ module decoder (
     assign fu_sel[2] = inst_beq | inst_bne | inst_bgez | inst_bgtz | inst_blez | inst_bltz | inst_bltzal | inst_bgezal | inst_j | inst_jal | inst_jr | inst_jalr;
     assign fu_sel[3] = inst_lb | inst_lbu | inst_lh | inst_lhu | inst_lw | inst_sb | inst_sh | inst_sw;
     assign fu_sel[4] = inst_mfhi | inst_mflo | inst_mthi | inst_mtlo | inst_mult | inst_multu | inst_div | inst_divu;
-    assign reg1 = rs;
-    assign reg2 = rt;
+    assign reg1 = (inst_mflo | inst_mfhi) ? 6'd32 : {1'b0, rs};
+    assign reg2 = {1'b0, rt};
     assign reg3 = rf_waddr;
     assign r1_val = inst_add | inst_addiu | inst_addu | inst_subu | inst_ori | inst_or | inst_sw | inst_lw 
                     | inst_xor | inst_sltu | inst_slt | inst_slti | inst_sltiu | inst_addi | inst_sub 
