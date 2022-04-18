@@ -193,17 +193,25 @@ module scoreboard(
             {busy[5],op[5],r[5],r1[5],r2[5],t1[5],t2[5]} <= {1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
             {busy[6],op[6],r[6],r1[6],r2[6],t1[6],t2[6]} <= {1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
             {busy[7],op[7],r[7],r1[7],r2[7],t1[7],t2[7]} <= {1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
+            iptr[0] <= 0; 
+            iptr[1] <= 0;
+            iptr[2] <= 0;
+            iptr[3] <= 0;
+            iptr[4] <= 0; 
+            iptr[5] <= 0;
+            iptr[6] <= 0;
+            iptr[7] <= 0;
         end
         else begin
             if (valid_inst[dptr]&~busy[inst_status[dptr][`FU]]&reg_status[inst_status[dptr][`REG3]]==`NULL) begin
                 iptr[fu_ptr] <= inst_status[dptr][`ADDR];
-                busy[dptr] <= 1'b1;
-                op[dptr] <= inst_status[dptr][`OP];
-                r[dptr] <= inst_status[dptr][`REG3];
-                r1[dptr] <= inst_status[dptr][`R1VAL] ? inst_status[dptr][`REG1] : 6'b111111;
-                r2[dptr] <= inst_status[dptr][`R2VAL] ? inst_status[dptr][`REG2] : 6'b111111;
-                t1[dptr] <= inst_status[dptr][`R1VAL] ? reg_status[inst_status[dptr][`REG1]] : `NULL;
-                t2[dptr] <= inst_status[dptr][`R2VAL] ? reg_status[inst_status[dptr][`REG2]] : `NULL;
+                busy[fu_ptr] <= 1'b1;
+                op[fu_ptr] <= inst_status[dptr][`OP];
+                r[fu_ptr] <= inst_status[dptr][`REG3];
+                r1[fu_ptr] <= inst_status[dptr][`R1VAL] ? inst_status[dptr][`REG1] : 6'b111111;
+                r2[fu_ptr] <= inst_status[dptr][`R2VAL] ? inst_status[dptr][`REG2] : 6'b111111;
+                t1[fu_ptr] <= inst_status[dptr][`R1VAL] ? reg_status[inst_status[dptr][`REG1]] : `NULL;
+                t2[fu_ptr] <= inst_status[dptr][`R2VAL] ? reg_status[inst_status[dptr][`REG2]] : `NULL;
             end
             if (valid_inst[iptr[0]] & writeback[iptr[0]]) begin
                 // t1[1] <= t1[1] == `ALU1 ? `NULL : t1[1];
@@ -245,14 +253,14 @@ module scoreboard(
     end
     
     // assign fu_rdy[0] = (t1[0] == `NULL) & (t2[0] == `NULL);
-    assign fu_rdy[0] = ~issue[iptr[0]] & (t1[0] == `NULL) & (t2[0] == `NULL);
-    assign fu_rdy[1] = ~issue[iptr[1]] & (t1[1] == `NULL) & (t2[1] == `NULL);
-    assign fu_rdy[2] = ~issue[iptr[2]] & (t1[2] == `NULL) & (t2[2] == `NULL);
-    assign fu_rdy[3] = ~issue[iptr[3]] & (t1[3] == `NULL) & (t2[3] == `NULL);
-    assign fu_rdy[4] = ~issue[iptr[4]] & (t1[4] == `NULL) & (t2[4] == `NULL);
-    assign fu_rdy[5] = ~issue[iptr[5]] & (t1[5] == `NULL) & (t2[5] == `NULL);
-    assign fu_rdy[6] = ~issue[iptr[6]] & (t1[6] == `NULL) & (t2[6] == `NULL);
-    assign fu_rdy[7] = ~issue[iptr[7]] & (t1[7] == `NULL) & (t2[7] == `NULL);
+    assign fu_rdy[0] = dispatch[iptr[0]] & ~issue[iptr[0]] & (t1[0] == `NULL) & (t2[0] == `NULL);
+    assign fu_rdy[1] = dispatch[iptr[1]] & ~issue[iptr[1]] & (t1[1] == `NULL) & (t2[1] == `NULL);
+    assign fu_rdy[2] = dispatch[iptr[2]] & ~issue[iptr[2]] & (t1[2] == `NULL) & (t2[2] == `NULL);
+    assign fu_rdy[3] = dispatch[iptr[3]] & ~issue[iptr[3]] & (t1[3] == `NULL) & (t2[3] == `NULL);
+    assign fu_rdy[4] = dispatch[iptr[4]] & ~issue[iptr[4]] & (t1[4] == `NULL) & (t2[4] == `NULL);
+    assign fu_rdy[5] = dispatch[iptr[5]] & ~issue[iptr[5]] & (t1[5] == `NULL) & (t2[5] == `NULL);
+    assign fu_rdy[6] = dispatch[iptr[6]] & ~issue[iptr[6]] & (t1[6] == `NULL) & (t2[6] == `NULL);
+    assign fu_rdy[7] = dispatch[iptr[7]] & ~issue[iptr[7]] & (t1[7] == `NULL) & (t2[7] == `NULL);
 
     always @ (posedge clk) begin
         if (!resetn) begin
