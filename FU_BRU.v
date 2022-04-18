@@ -32,6 +32,12 @@ module FU_BRU(
             r_rdata2 <= rdata2;
             r_inst_status <= inst_status;
         end    
+        else begin
+            r_op <= 12'b0;
+            r_rdata1 <= 32'b0;
+            r_rdata2 <= 32'b0;
+            r_inst_status <= `INST_STATE_WD'b0;
+        end
     end
     wire [31:0] br_addr;
     wire rs_eq_rt;
