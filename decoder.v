@@ -297,8 +297,8 @@ module decoder (
     assign fu_sel[2] = inst_beq | inst_bne | inst_bgez | inst_bgtz | inst_blez | inst_bltz | inst_bltzal | inst_bgezal | inst_j | inst_jal | inst_jr | inst_jalr;
     assign fu_sel[3] = inst_lb | inst_lbu | inst_lh | inst_lhu | inst_lw | inst_sb | inst_sh | inst_sw;
     assign fu_sel[4] = inst_mfhi | inst_mflo | inst_mthi | inst_mtlo | inst_mult | inst_multu | inst_div | inst_divu;
-    assign reg1 = (inst_mflo | inst_mfhi) ? 6'd32 : {1'b0, rs};
-    assign reg2 = {1'b0, rt};
+    assign reg1 = {1'b0, rs};
+    assign reg2 = (inst_mflo | inst_mfhi) ? 6'd32 : {1'b0, rt};
     assign reg3 = rf_waddr;
     assign r1_val = inst_add | inst_addiu | inst_addu | inst_subu | inst_ori | inst_or | inst_sw | inst_lw 
                     | inst_xor | inst_sltu | inst_slt | inst_slti | inst_sltiu | inst_addi | inst_sub 
@@ -308,7 +308,8 @@ module decoder (
                     | inst_mthi | inst_mtlo | inst_mult | inst_multu | inst_div | inst_divu;
     assign r2_val = inst_add | inst_addu | inst_subu | inst_sll | inst_or | inst_xor | inst_sltu | inst_slt
                     | inst_sub | inst_and | inst_nor | inst_sllv | inst_sra | inst_srav | inst_srl | inst_srlv
-                    | inst_beq | inst_bne | inst_sb | inst_sh | inst_sw | inst_mult | inst_multu | inst_div | inst_divu;
+                    | inst_beq | inst_bne | inst_sb | inst_sh | inst_sw | inst_mult | inst_multu | inst_div | inst_divu
+                    | inst_mflo | inst_mfhi;
     // reg1 useless or reg1 use imm
     assign r1_rdy = ~r1_val;
     // reg2 useless or reg2 use imm

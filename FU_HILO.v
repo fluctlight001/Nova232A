@@ -16,8 +16,10 @@ module FU_HILO (
     output wire [31:0] extra_wdata
 );
     reg [11:0] r_op;
-    reg [31:0] r_rdata1, r_rdata2;
+    reg [31:0] r_rdata1;
+    reg [63:0] r_rdata2;
     reg [`INST_STATE_WD-1:0] r_inst_status;
+    wire busy;
 
     always @ (posedge clk) begin
         if (!resetn) begin
@@ -31,6 +33,9 @@ module FU_HILO (
             r_rdata1 <= rdata1;
             r_rdata2 <= rdata2;
             r_inst_status <= inst_status;
+        end
+        else if (busy) begin
+            
         end    
         else begin
             r_op <= 12'b0;
@@ -56,6 +61,10 @@ module FU_HILO (
 
     assign op_mul = inst_mult | inst_multu;
     assign op_div = inst_div | inst_divu;
+
+    wire [31:0] src1, src2;
+    assign src1 = r_rdata1;
+    assign src2 = inst_mfhi ? r_rdata2[63:32] : r_rdata2[31:0];
 
     // MUL part
     mul u_mul(
@@ -170,6 +179,6 @@ module FU_HILO (
     assign cb_we = ~busy & |r_inst_status[`OP];
     assign we = ~busy & r_inst_status[`WE];
     assign waddr = r_inst_status[`ADDR];
-    assign wdata = inst_mflo ? lo_rdata : inst_mfhi ? hi_rdata : inst_mtlo ? src1 : lo_o;
+    assign wdata = inst_mflo ? src2 : inst_mfhi ? src2 : inst_mtlo ? src1 : lo_o;
     assign extra_wdata = inst_mthi ? src1 : hi_o;
 endmodule

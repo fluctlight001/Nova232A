@@ -284,6 +284,25 @@ module scoreboard(
                 {busy[3],op[3],r[3],r1[3],r2[3],t1[3],t2[3]} <= {1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
                 iptr[3] <= 0;
             end
+            else if (valid_inst[iptr[4]] & writeback[iptr[4]] & iptr[4]==raddr & retire_en[0] & busy[4]) begin
+                // t1[1] <= t1[1] == `ALU1 ? `NULL : t1[1];
+                t1[0] <= t1[0] == `HILO ? `NULL : t1[0];
+                t2[0] <= t2[0] == `HILO ? `NULL : t2[0];
+                t1[1] <= t1[1] == `HILO ? `NULL : t1[1];
+                t2[1] <= t2[1] == `HILO ? `NULL : t2[1];
+                t1[2] <= t1[2] == `HILO ? `NULL : t1[2];
+                t2[2] <= t2[2] == `HILO ? `NULL : t2[2];
+                t1[3] <= t1[3] == `HILO ? `NULL : t1[3];
+                t2[3] <= t2[3] == `HILO ? `NULL : t2[3];
+                t1[5] <= t1[5] == `HILO ? `NULL : t1[5];
+                t2[5] <= t2[5] == `HILO ? `NULL : t2[5];
+                t1[6] <= t1[6] == `HILO ? `NULL : t1[6];
+                t2[6] <= t2[6] == `HILO ? `NULL : t2[6];
+                t1[7] <= t1[7] == `HILO ? `NULL : t1[7];
+                t2[7] <= t2[7] == `HILO ? `NULL : t2[7];
+                {busy[4],op[4],r[4],r1[4],r2[4],t1[4],t2[4]} <= {1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
+                iptr[4] <= 0;
+            end
             if (dispatch_ok) begin
                 iptr[fu_ptr] <= inst_status[dptr][`ADDR];
                 busy[fu_ptr] <= 1'b1;
@@ -406,9 +425,10 @@ module scoreboard(
     wire [5:0] raddr2 [7:0];
     wire [31:0] rdata1 [7:0];
     wire [31:0] rdata2 [7:0];
+    wire [31:0] rdata_hi;
     wire [3:0] rf_we_o;
     wire [5:0] rf_waddr [3:0];
-    wire [31:0] rf_wdata [3:0];
+    wire [63:0] rf_wdata [3:0];
     // assign raddr1[0] = r1[0];
     // assign raddr2[0] = r2[0];
     assign raddr1[0] = r1[0];
@@ -430,12 +450,12 @@ module scoreboard(
 
     assign rf_we_o[0] = retire_en[0];
     assign rf_waddr[0] = retire_en[0] ? inst_status[raddr][`REG3] : 6'b0;
-    assign rf_wdata[0] = retire_en[0] ? cb[raddr] : 32'b0;
+    assign rf_wdata[0] = retire_en[0] ? {cb_extra[raddr], cb[raddr]} : 64'b0;
 
     assign debug_wb_pc = retire_en[0] ? inst_status[raddr][`PC] : 32'b0;
     assign debug_wb_rf_wen = {4{rf_we_o[0]}};
     assign debug_wb_rf_wnum = rf_waddr[0];
-    assign debug_wb_rf_wdata = rf_wdata[0];
+    assign debug_wb_rf_wdata = rf_wdata[0][31:0];
 
     regfile u_regfile(
     	.clk     (clk     ),
@@ -458,7 +478,7 @@ module scoreboard(
         .raddr41 (raddr1[4] ),
         .raddr42 (raddr2[4] ),
         .rdata41 (rdata1[4] ),
-        .rdata42 (rdata2[4] ),
+        .rdata42 ({rdata_hi, rdata2[4]} ),
         .raddr51 (raddr1[5] ),
         .raddr52 (raddr2[5] ),
         .rdata51 (rdata1[5] ),
@@ -513,7 +533,7 @@ module scoreboard(
         .br_e        (br_e                  )
     );
 
-    FU_AGU u_FU_AGU(
+    FU_AGU u3_FU(
     	.clk             (clk               ),
         .resetn          (resetn            ),
         .ready           (fu_rdy[3]         ),
@@ -529,6 +549,20 @@ module scoreboard(
         .data_sram_addr  (data_sram_addr    ),
         .data_sram_wdata (data_sram_wdata   ),
         .data_sram_rdata (data_sram_rdata   )
+    );
+    
+    FU_HILO u4_FU(
+    	.clk         (clk         ),
+        .resetn      (resetn      ),
+        .ready       (fu_rdy[4]       ),
+        .op          (op[4]          ),
+        .inst_status (inst_status[iptr[4]] ),
+        .rdata1      (rdata1[4]      ),
+        .rdata2      ({rdata_hi, rdata2[4]}),
+        .cb_we       (cb_we[4]       ),
+        .rf_we       (rf_we[4]       ),
+        .wdata       (wdata[4]       ),
+        .extra_wdata (extra_wdata[4] )
     );
     
     
@@ -575,6 +609,7 @@ module scoreboard(
             if (cb_we[0]) {rf_we_r[iptr[0]], cb[iptr[0]]} <= {rf_we[0], wdata[0]};
             if (cb_we[2]) {br_e_r[iptr[2]], rf_we_r[iptr[2]], cb[iptr[2]], cb_extra[iptr[2]]} <= {br_e, rf_we[2], wdata[2], extra_wdata[2]};
             if (cb_we[3]) {rf_we_r[iptr[3]], cb[iptr[3]]} <= {rf_we[3], wdata[3]};
+            if (cb_we[4]) {rf_we_r[iptr[4]], cb[iptr[4]], cb_extra[iptr[4]]} <= {rf_we[4], wdata[4], extra_wdata[4]};
             if (br_bus[32]) br_e_r <= 16'b0;
         end
     end
