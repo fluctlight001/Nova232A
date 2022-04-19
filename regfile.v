@@ -15,7 +15,8 @@ module regfile(
     output wire [31:0] rdata31, rdata32,
 
     input wire [5:0] raddr41, raddr42,
-    output wire [31:0] rdata41, rdata42,
+    output wire [31:0] rdata41, 
+    output wire [63:0] rdata42,
     
     input wire [5:0] raddr51, raddr52,
     output wire [31:0] rdata51, rdata52,
@@ -28,9 +29,10 @@ module regfile(
 
     input wire we0, we1, we2, we3, 
     input wire [5:0] waddr0, waddr1, waddr2, waddr3,
-    input wire [31:0] wdata0, wdata1, wdata2, wdata3
+    input wire [63:0] wdata0, wdata1, wdata2, wdata3
 );
-    reg [31:0] reg_array [33:0]; // gpr + hilo
+    reg [31:0] reg_array [31:0]; // gpr
+    reg [63:0] hilo_reg;
     // // write
     // always @ (posedge clk) begin
     //     if (we && waddr!=6'b0) begin
@@ -46,23 +48,24 @@ module regfile(
 
     // write
     always @ (posedge clk) begin
-        if (we0 && waddr0!=6'b0) reg_array[waddr0] <= wdata0;
+        if (we0 && waddr0!=6'b0 && waddr0!=6'd32) reg_array[waddr0] <= wdata0[31:0];
+        else if (we0 && waddr0 == 6'd32) hilo_reg <= wdata0;
         if (we1 && waddr1!=6'b0) reg_array[waddr1] <= wdata1;
         if (we2 && waddr2!=6'b0) reg_array[waddr2] <= wdata2;
         if (we3 && waddr3!=6'b0) reg_array[waddr3] <= wdata3;
     end
 
     // read 
-    assign rdata01 = (raddr01 == 6'b0) ? 32'b0 : reg_array[raddr01];
-    assign rdata02 = (raddr02 == 6'b0) ? 32'b0 : reg_array[raddr02];
+    assign rdata01 = (raddr01 == 6'b0) ? 32'b0 : waddr0 == raddr01 ? wdata0[31:0] : reg_array[raddr01];
+    assign rdata02 = (raddr02 == 6'b0) ? 32'b0 : waddr0 == raddr02 ? wdata0[31:0] : reg_array[raddr02];
     assign rdata11 = (raddr11 == 6'b0) ? 32'b0 : reg_array[raddr11];
     assign rdata12 = (raddr12 == 6'b0) ? 32'b0 : reg_array[raddr12];
-    assign rdata21 = (raddr21 == 6'b0) ? 32'b0 : reg_array[raddr21];
-    assign rdata22 = (raddr22 == 6'b0) ? 32'b0 : reg_array[raddr22];
-    assign rdata31 = (raddr31 == 6'b0) ? 32'b0 : reg_array[raddr31];
-    assign rdata32 = (raddr32 == 6'b0) ? 32'b0 : reg_array[raddr32];
-    assign rdata41 = (raddr41 == 6'b0) ? 32'b0 : reg_array[raddr41];
-    assign rdata42 = (raddr42 == 6'b0) ? 32'b0 : reg_array[raddr42];
+    assign rdata21 = (raddr21 == 6'b0) ? 32'b0 : waddr0 == raddr21 ? wdata0[31:0] : reg_array[raddr21];
+    assign rdata22 = (raddr22 == 6'b0) ? 32'b0 : waddr0 == raddr22 ? wdata0[31:0] : reg_array[raddr22];
+    assign rdata31 = (raddr31 == 6'b0) ? 32'b0 : waddr0 == raddr31 ? wdata0[31:0] : reg_array[raddr31];
+    assign rdata32 = (raddr32 == 6'b0) ? 32'b0 : waddr0 == raddr32 ? wdata0[31:0] : reg_array[raddr32];
+    assign rdata41 = (raddr41 == 6'b0) ? 32'b0 : waddr0 == raddr41 ? wdata0[31:0] : reg_array[raddr41];
+    assign rdata42 = (raddr42 == 6'b0) ? 64'b0 : waddr0 == raddr42 ? wdata0 : (raddr42 == 6'd32) ? hilo_reg : {32'b0, reg_array[raddr42]};
     assign rdata51 = (raddr51 == 6'b0) ? 32'b0 : reg_array[raddr51];
     assign rdata52 = (raddr52 == 6'b0) ? 32'b0 : reg_array[raddr52];
     assign rdata61 = (raddr61 == 6'b0) ? 32'b0 : reg_array[raddr61];
