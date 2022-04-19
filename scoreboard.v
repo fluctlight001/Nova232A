@@ -368,6 +368,25 @@ module scoreboard(
                 {busy[4],op[4],r[4],r1[4],r2[4],t1[4],t2[4]} <= {1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
                 iptr[4] <= 0;
             end
+            else if (valid_inst[iptr[5]] & writeback[iptr[5]] & iptr[5]==raddr & retire_en[0] & busy[5]) begin
+                // t1[1] <= t1[1] == `ALU1 ? `NULL : t1[1];
+                t1[0] <= t1[0] == `ALU3 ? `NULL : t1[0];
+                t2[0] <= t2[0] == `ALU3 ? `NULL : t2[0];
+                t1[1] <= t1[1] == `ALU3 ? `NULL : t1[1];
+                t2[1] <= t2[1] == `ALU3 ? `NULL : t2[1];
+                t1[2] <= t1[2] == `ALU3 ? `NULL : t1[2];
+                t2[2] <= t2[2] == `ALU3 ? `NULL : t2[2];
+                t1[3] <= t1[3] == `ALU3 ? `NULL : t1[3];
+                t2[3] <= t2[3] == `ALU3 ? `NULL : t2[3];
+                t1[4] <= t1[4] == `ALU3 ? `NULL : t1[4];
+                t2[4] <= t2[4] == `ALU3 ? `NULL : t2[4];
+                t1[6] <= t1[6] == `ALU3 ? `NULL : t1[6];
+                t2[6] <= t2[6] == `ALU3 ? `NULL : t2[6];
+                t1[7] <= t1[7] == `ALU3 ? `NULL : t1[7];
+                t2[7] <= t2[7] == `ALU3 ? `NULL : t2[7];
+                {busy[5],op[5],r[5],r1[5],r2[5],t1[5],t2[5]} <= {1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
+                iptr[5] <= 0;
+            end
             if (dispatch_ok) begin
                 iptr[fu_ptr] <= inst_status[dptr][`ADDR];
                 busy[fu_ptr] <= 1'b1;
@@ -643,6 +662,20 @@ module scoreboard(
         .wdata       (wdata[4]       ),
         .extra_wdata (extra_wdata[4] )
     );
+
+    FU_ALU u5_FU(
+    	.clk         (clk         ),
+        .resetn      (resetn      ),
+        .ready       (fu_rdy[5]       ),
+        .op          (op[5]          ),
+        .inst_status (inst_status[iptr[5]] ),
+        .rdata1      (rdata1[5]      ),
+        .rdata2      (rdata2[5]      ),
+        .cb_we       (cb_we[5]       ),
+        .rf_we       (rf_we[5]       ),
+        .wdata       (wdata[5]       )
+    );
+    
     
     
 
@@ -690,6 +723,7 @@ module scoreboard(
             if (cb_we[2]) {br_e_r[iptr[2]], rf_we_r[iptr[2]], cb[iptr[2]], cb_extra[iptr[2]]} <= {br_e, rf_we[2], wdata[2], extra_wdata[2]};
             if (cb_we[3]) {rf_we_r[iptr[3]], cb[iptr[3]]} <= {rf_we[3], wdata[3]};
             if (cb_we[4]) {rf_we_r[iptr[4]], cb[iptr[4]], cb_extra[iptr[4]]} <= {rf_we[4], wdata[4], extra_wdata[4]};
+            if (cb_we[5]) {rf_we_r[iptr[5]], cb[iptr[5]]} <= {rf_we[5], wdata[5]};
             if (br_bus[32]) br_e_r <= 16'b0;
         end
     end

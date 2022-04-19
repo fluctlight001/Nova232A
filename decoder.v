@@ -276,13 +276,13 @@ module decoder (
 
     
     wire alu_inst = |alu_op;
-    reg [1:0] alu_sel;
+    reg [2:0] alu_sel;
     always @ (posedge clk) begin
         if (!resetn) begin
-            alu_sel <= 2'b01;
+            alu_sel <= 3'b001;
         end
         else if (alu_inst) begin
-            alu_sel <= {alu_sel[0], alu_sel[1]};
+            alu_sel <= {alu_sel[1:0], alu_sel[2]};
         end
     end
 //  output
@@ -305,12 +305,14 @@ module decoder (
                 | {3{fu_sel[1]}} & 3'd1
                 | {3{fu_sel[2]}} & 3'd2
                 | {3{fu_sel[3]}} & 3'd3
-                | {3{fu_sel[4]}} & 3'd4;
-    assign fu_sel[0] = alu_sel[0] & {4{alu_inst}};
-    assign fu_sel[1] = alu_sel[1] & {4{alu_inst}};
+                | {3{fu_sel[4]}} & 3'd4
+                | {3{fu_sel[5]}} & 3'd5;
+    assign fu_sel[0] = alu_sel[0] & alu_inst;
+    assign fu_sel[1] = alu_sel[1] & alu_inst;
     assign fu_sel[2] = inst_beq | inst_bne | inst_bgez | inst_bgtz | inst_blez | inst_bltz | inst_bltzal | inst_bgezal | inst_j | inst_jal | inst_jr | inst_jalr;
     assign fu_sel[3] = inst_lb | inst_lbu | inst_lh | inst_lhu | inst_lw | inst_sb | inst_sh | inst_sw;
     assign fu_sel[4] = inst_mfhi | inst_mflo | inst_mthi | inst_mtlo | inst_mult | inst_multu | inst_div | inst_divu;
+    assign fu_sel[5] = alu_sel[2] & alu_inst;
     assign reg1 = {1'b0, rs};
     assign reg2 = (inst_mflo | inst_mfhi) ? 6'd32 : {1'b0, rt};
     assign reg3 = rf_waddr;

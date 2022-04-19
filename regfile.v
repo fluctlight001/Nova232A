@@ -66,8 +66,8 @@ module regfile(
     assign rdata32 = (raddr32 == 6'b0) ? 32'b0 : waddr0 == raddr32 ? wdata0[31:0] : reg_array[raddr32];
     assign rdata41 = (raddr41 == 6'b0) ? 32'b0 : waddr0 == raddr41 ? wdata0[31:0] : reg_array[raddr41];
     assign rdata42 = (raddr42 == 6'b0) ? 64'b0 : waddr0 == raddr42 ? wdata0 : (raddr42 == 6'd32) ? hilo_reg : {32'b0, reg_array[raddr42]};
-    assign rdata51 = (raddr51 == 6'b0) ? 32'b0 : reg_array[raddr51];
-    assign rdata52 = (raddr52 == 6'b0) ? 32'b0 : reg_array[raddr52];
+    assign rdata51 = (raddr51 == 6'b0) ? 32'b0 : waddr0 == raddr51 ? wdata0[31:0] : reg_array[raddr51];
+    assign rdata52 = (raddr52 == 6'b0) ? 32'b0 : waddr0 == raddr52 ? wdata0[31:0] : reg_array[raddr52];
     assign rdata61 = (raddr61 == 6'b0) ? 32'b0 : reg_array[raddr61];
     assign rdata62 = (raddr62 == 6'b0) ? 32'b0 : reg_array[raddr62];
     assign rdata71 = (raddr71 == 6'b0) ? 32'b0 : reg_array[raddr71];
