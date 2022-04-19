@@ -58,8 +58,8 @@ module regfile(
     // read 
     assign rdata01 = (raddr01 == 6'b0) ? 32'b0 : waddr0 == raddr01 ? wdata0[31:0] : reg_array[raddr01];
     assign rdata02 = (raddr02 == 6'b0) ? 32'b0 : waddr0 == raddr02 ? wdata0[31:0] : reg_array[raddr02];
-    assign rdata11 = (raddr11 == 6'b0) ? 32'b0 : reg_array[raddr11];
-    assign rdata12 = (raddr12 == 6'b0) ? 32'b0 : reg_array[raddr12];
+    assign rdata11 = (raddr11 == 6'b0) ? 32'b0 : waddr0 == raddr11 ? wdata0[31:0] : reg_array[raddr11];
+    assign rdata12 = (raddr12 == 6'b0) ? 32'b0 : waddr0 == raddr12 ? wdata0[31:0] : reg_array[raddr12];
     assign rdata21 = (raddr21 == 6'b0) ? 32'b0 : waddr0 == raddr21 ? wdata0[31:0] : reg_array[raddr21];
     assign rdata22 = (raddr22 == 6'b0) ? 32'b0 : waddr0 == raddr22 ? wdata0[31:0] : reg_array[raddr22];
     assign rdata31 = (raddr31 == 6'b0) ? 32'b0 : waddr0 == raddr31 ? wdata0[31:0] : reg_array[raddr31];

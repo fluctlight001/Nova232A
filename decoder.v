@@ -273,6 +273,18 @@ module decoder (
                  | {32{sel_alu_imm[2]}} & {16'b0, inst[15:0]}               // imm_zero_extend
                  | {32{sel_alu_imm[3]}} & {{14{inst[15]}},inst[15:0],2'b0}  // offset_sign_extend
                  | {32{sel_alu_imm[4]}} & {pc_r[31:28],instr_index,2'b0};   // instr_index_extend
+
+    
+    wire alu_inst = |alu_op;
+    reg [1:0] alu_sel;
+    always @ (posedge clk) begin
+        if (!resetn) begin
+            alu_sel <= 2'b01;
+        end
+        else if (alu_inst) begin
+            alu_sel <= {alu_sel[0], alu_sel[1]};
+        end
+    end
 //  output
     wire except_sw;
     wire [31:0] excepttype;
@@ -290,10 +302,12 @@ module decoder (
     assign excepttype = 32'b0;
     assign op = alu_op | hilo_op | mem_op | br_op;
     assign fu   = {3{fu_sel[0]}} & 3'd0
+                | {3{fu_sel[1]}} & 3'd1
                 | {3{fu_sel[2]}} & 3'd2
                 | {3{fu_sel[3]}} & 3'd3
                 | {3{fu_sel[4]}} & 3'd4;
-    assign fu_sel[0] = inst_addiu;
+    assign fu_sel[0] = alu_sel[0] & {4{alu_inst}};
+    assign fu_sel[1] = alu_sel[1] & {4{alu_inst}};
     assign fu_sel[2] = inst_beq | inst_bne | inst_bgez | inst_bgtz | inst_blez | inst_bltz | inst_bltzal | inst_bgezal | inst_j | inst_jal | inst_jr | inst_jalr;
     assign fu_sel[3] = inst_lb | inst_lbu | inst_lh | inst_lhu | inst_lw | inst_sb | inst_sh | inst_sw;
     assign fu_sel[4] = inst_mfhi | inst_mflo | inst_mthi | inst_mtlo | inst_mult | inst_multu | inst_div | inst_divu;
