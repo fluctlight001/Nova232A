@@ -227,7 +227,7 @@ module scoreboard(
             iptr[7] <= 0;
         end
         else begin
-            if (valid_inst[iptr[0]] & writeback[iptr[0]]) begin
+            if (valid_inst[iptr[0]] & writeback[iptr[0]] & iptr[0]==raddr & retire_en[0] & busy[0]) begin
                 // t1[1] <= t1[1] == `ALU1 ? `NULL : t1[1];
                 t1[1] <= t1[1] == `ALU1 ? `NULL : t1[1];
                 t2[1] <= t2[1] == `ALU1 ? `NULL : t2[1];
@@ -244,8 +244,9 @@ module scoreboard(
                 t1[7] <= t1[7] == `ALU1 ? `NULL : t1[7];
                 t2[7] <= t2[7] == `ALU1 ? `NULL : t2[7];
                 {busy[0],op[0],r[0],r1[0],r2[0],t1[0],t2[0]} <= {1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
+                iptr[0] <= 0;
             end
-            if (valid_inst[iptr[2]] & writeback[iptr[2]]) begin
+            else if (valid_inst[iptr[2]] & writeback[iptr[2]] & iptr[2]==raddr & retire_en[0] & busy[2]) begin
                 // t1[1] <= t1[1] == `ALU1 ? `NULL : t1[1];
                 t1[0] <= t1[0] == `BRU ? `NULL : t1[0];
                 t2[0] <= t2[0] == `BRU ? `NULL : t2[0];
@@ -262,8 +263,9 @@ module scoreboard(
                 t1[7] <= t1[7] == `BRU ? `NULL : t1[7];
                 t2[7] <= t2[7] == `BRU ? `NULL : t2[7];
                 {busy[2],op[2],r[2],r1[2],r2[2],t1[2],t2[2]} <= {1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
+                iptr[2] <= 0;
             end
-            if (valid_inst[iptr[3]] & writeback[iptr[3]]) begin
+            else if (valid_inst[iptr[3]] & writeback[iptr[3]] & iptr[3]==raddr & retire_en[0] & busy[3]) begin
                 // t1[1] <= t1[1] == `ALU1 ? `NULL : t1[1];
                 t1[0] <= t1[0] == `AGU ? `NULL : t1[0];
                 t2[0] <= t2[0] == `AGU ? `NULL : t2[0];
@@ -280,6 +282,7 @@ module scoreboard(
                 t1[7] <= t1[7] == `AGU ? `NULL : t1[7];
                 t2[7] <= t2[7] == `AGU ? `NULL : t2[7];
                 {busy[3],op[3],r[3],r1[3],r2[3],t1[3],t2[3]} <= {1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
+                iptr[3] <= 0;
             end
             if (dispatch_ok) begin
                 iptr[fu_ptr] <= inst_status[dptr][`ADDR];
@@ -376,7 +379,9 @@ module scoreboard(
             reg_status[31] <= `NULL;
             reg_status[32] <= `NULL;
             reg_status[33] <= `NULL;
-            reg_status[raddr+1'b1] <= reg_status[raddr+1'b1];
+            if (dispatch_ok) begin
+                reg_status[inst_status[dptr][`REG3]] <= inst_status[dptr][`REG3]==0 ? `NULL : inst_status[dptr][`FU];
+            end
         end
         else begin
             // if (valid_inst[iptr[0]] & writeback[iptr[0]]) begin
