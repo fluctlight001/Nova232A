@@ -25,18 +25,25 @@ module IF (
 
     wire br_e;
     wire [31:0] br_addr;
+
+    reg r_br_e;
+    reg [31:0] r_br_addr;
     
     assign {br_e, br_addr} = br_bus;
 
     always @ (posedge clk) begin
         if (!resetn) begin
             pc_reg <= 32'hbfbf_fffc;
+            r_br_e <= 1'b0;
+            r_br_addr <= 32'b0;
         end
         else if (!stall) begin
-            pc_reg <= next_pc;
+            pc_reg <= r_br_e ? r_br_addr : br_e ? br_addr : next_pc;
+            r_br_e <= 1'b0;
         end
         else if (br_e) begin
-            pc_reg <= br_addr;
+            r_br_e <= br_e;
+            r_br_addr <= br_addr;
         end
     end
 
@@ -49,14 +56,13 @@ module IF (
         end
     end
 
-    assign next_pc = br_e ? br_addr :
-                 pc_reg + 32'd4;
+    assign next_pc = pc_reg + 32'd4;
 
     assign ce_next = ~resetn ? 1'b0 : 1'b1;
 
-    assign inst_sram_en = ce_next;
+    assign inst_sram_en = ce_reg;
     assign inst_sram_wen = 4'b0;
-    assign inst_sram_addr = next_pc;
+    assign inst_sram_addr = pc_reg;
     assign inst_sram_wdata = 32'b0;
 
 endmodule

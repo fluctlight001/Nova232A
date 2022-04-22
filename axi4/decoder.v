@@ -3,7 +3,7 @@ module decoder (
     input wire clk,
     input wire resetn,
 
-    input wire br_e,
+    input wire [`BR_WD-1:0] br_bus,
     input wire stall,
     
     input wire [31:0] pc,
@@ -13,41 +13,64 @@ module decoder (
     output wire [`ID_TO_SB_WD-1:0] id_to_sb_bus
 );
 
-    reg [31:0] pc_r, inst_sram_rdata_r;
+    reg [31:0] sram_pc, pc_r, inst_sram_rdata_r;
+    wire br_e;
+    wire [31:0] br_addr;
+    assign {br_e, br_addr} = br_bus;
+
+    always @ (posedge clk) begin
+        if (!resetn | br_e) begin
+            sram_pc <= 32'b0;
+        end
+        else begin
+            sram_pc <= pc;
+        end
+    end
+
+    wire cmp;
+    reg cmp_valid;
+    reg [31:0] r_br_addr;
+
+    always @ (posedge clk) begin
+        if (!resetn) begin
+            cmp_valid <= 1'b0;
+            r_br_addr <= 32'hbfc00000;
+        end
+        else if (br_e) begin
+            cmp_valid <= 1'b0;
+            r_br_addr <= br_addr;
+        end
+        else if (cmp) begin
+            cmp_valid <= 1'b1;
+            r_br_addr <= 32'b0;
+        end
+    end
+
+    assign cmp = cmp_valid | (sram_pc == r_br_addr) ? 1'b1 : 1'b0;
+
     reg flag;
     reg [31:0] buf_pc, buf_inst;
 
     always @ (posedge clk) begin
-        if (stall & ~flag) begin
-            buf_pc <= pc;
+        if (stall & !flag) begin
+            buf_pc <= sram_pc;
             buf_inst <= inst_sram_rdata;
         end
     end
+
     always @ (posedge clk) begin
-        if (!resetn) begin
+        if (!resetn | !cmp | br_e) begin
             pc_r <= 32'b0;
             inst_sram_rdata_r <= 32'b0;
             flag <= 1'b0;
         end
-        else if (br_e) begin
-            pc_r <= 32'b0;
-            inst_sram_rdata_r <= 32'b0;
+        else if (!stall) begin
+            pc_r <= flag ? buf_pc : sram_pc;
+            inst_sram_rdata_r <= flag ? buf_inst : inst_sram_rdata;
             flag <= 1'b0;
         end
-        else if (stall & ~flag) begin
+        else if (!flag) begin
             flag <= 1'b1;
-        end
-        else if (stall) begin
-            
-        end
-        else if (flag) begin
-            flag <= 1'b0;
-            pc_r <= buf_pc;
-            inst_sram_rdata_r <= buf_inst;
-        end
-        else begin
-            pc_r <= pc;
-            inst_sram_rdata_r <= inst_sram_rdata;
         end
     end
 
@@ -356,7 +379,7 @@ module decoder (
         pc_r        // 31:0
     };
 
-    assign inst_valid = (|pc_r) & 
+    assign inst_valid = (|pc_r) & (~stall) &
                         (inst_add | inst_addi | inst_addu | inst_addiu
                         | inst_sub | inst_subu | inst_slt | inst_slti 
                         | inst_sltu | inst_sltiu | inst_div | inst_divu
