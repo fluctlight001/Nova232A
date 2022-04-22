@@ -45,7 +45,7 @@ module mycpu_core(
     decoder u_decoder(
     	.clk             (clk             ),
         .resetn          (resetn          ),
-        .br_e            (br_bus[32]      ),
+        .br_bus          (br_bus          ),
         .stall           (stall           ),
         .pc              (pc              ),
         .inst_sram_rdata (inst_sram_rdata ),
