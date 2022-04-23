@@ -116,6 +116,6 @@ module FU_AGU(
                         {32{mem_lw}}  & w_data;
 
     assign cb_we = |r_inst_status_mem[`OP];
-    assign rf_we = r_inst_status_mem[`OP];
+    assign rf_we = r_inst_status_mem[`WE];
     assign wdata = mem_result;
 endmodule

@@ -551,7 +551,7 @@ module scoreboard(
     assign raddr1[7] = r1[7];
     assign raddr2[7] = r2[7];
 
-    assign rf_we_o[0] = retire_en[0];
+    assign rf_we_o[0] = retire_en[0] ? rf_we_r[raddr] : 1'b0;
     assign rf_waddr[0] = retire_en[0] ? inst_status[raddr][`REG3] : 6'b0;
     assign rf_wdata[0] = retire_en[0] ? {cb_extra[raddr], cb[raddr]} : 64'b0;
 
