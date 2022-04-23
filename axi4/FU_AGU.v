@@ -4,6 +4,7 @@ module FU_AGU(
     input wire resetn,
 
     input wire ready,
+    input wire dcache_miss,
 
     input wire [11:0] op,
     input wire [`INST_STATE_WD-1:0] inst_status,
@@ -38,6 +39,9 @@ module FU_AGU(
             r_rdata2 <= rdata2;
             r_inst_status_ex <= inst_status;
         end    
+        else if (dcache_miss) begin
+            
+        end
         else begin
             r_op <= 12'b0;
             r_rdata1 <= 32'b0;
@@ -83,6 +87,9 @@ module FU_AGU(
             r_inst_status_mem <= `INST_STATE_WD'b0;
             r_data_sram_sel <= 4'b0;
         end
+        else if (dcache_miss) begin
+            
+        end
         else begin
             r_inst_status_mem <= r_inst_status_ex;
             r_data_sram_sel <= data_sram_sel;
@@ -115,7 +122,7 @@ module FU_AGU(
                         {32{mem_lhu}} & {{16{1'b0}},h_data} |
                         {32{mem_lw}}  & w_data;
 
-    assign cb_we = |r_inst_status_mem[`OP];
-    assign rf_we = r_inst_status_mem[`OP];
+    assign cb_we = dcache_miss ? 1'b0 : |r_inst_status_mem[`OP];
+    assign rf_we = dcache_miss ? 1'b0 : r_inst_status_mem[`WE];
     assign wdata = mem_result;
 endmodule

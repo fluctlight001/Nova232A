@@ -1,7 +1,8 @@
 `include "defines.vh"
 module mmu (
     input wire[31:0] addr_i,
-    output wire [31:0] addr_o
+    output wire [31:0] addr_o,
+    output wire cache_v
 );
     wire [2:0] addr_head_i, addr_head_o;
     wire kseg0, kseg1, other_seg;
@@ -16,5 +17,7 @@ module mmu (
     assign addr_head_o = {3{kseg0}}&3'b000 | {3{kseg1}}&3'b000 | {3{other_seg}}&addr_head_i;
     
     assign addr_o = {addr_head_o, addr_i[28:0]};
+
+    assign cache_v = ~kseg1;
 
 endmodule

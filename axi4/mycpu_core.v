@@ -3,7 +3,8 @@ module mycpu_core(
     input wire clk,
     input wire resetn,
     input wire [5:0] int,
-    input wire stallreq_from_out,
+    input wire stallreq_from_i,
+    input wire stallreq_from_d,
 
     output wire inst_sram_en,
     output wire [3:0] inst_sram_wen,
@@ -28,7 +29,7 @@ module mycpu_core(
     wire inst1_valid;
     wire [`ID_TO_SB_WD-1:0] inst1_bus;
     wire stallreq;
-    assign stall = stallreq | stallreq_from_out;
+    assign stall = stallreq | stallreq_from_i;
 
 
     IF u_IF(
@@ -57,6 +58,7 @@ module mycpu_core(
     scoreboard u_scoreboard(
     	.clk               (clk               ),
         .resetn            (resetn            ),
+        .dcache_miss       (stallreq_from_d   ),
         .stallreq          (stallreq          ),
         .inst1_valid       (inst1_valid       ),
         .inst1             (inst1_bus         ),

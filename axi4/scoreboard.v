@@ -3,6 +3,7 @@ module scoreboard(
     input wire clk,
     input wire resetn,
 
+    input wire dcache_miss,
     output wire stallreq,
 
     input wire inst1_valid,
@@ -551,7 +552,7 @@ module scoreboard(
     assign raddr1[7] = r1[7];
     assign raddr2[7] = r2[7];
 
-    assign rf_we_o[0] = retire_en[0];
+    assign rf_we_o[0] = retire_en[0] ? rf_we_r[raddr] : 1'b0;
     assign rf_waddr[0] = retire_en[0] ? inst_status[raddr][`REG3] : 6'b0;
     assign rf_wdata[0] = retire_en[0] ? {cb_extra[raddr], cb[raddr]} : 64'b0;
 
@@ -654,6 +655,7 @@ module scoreboard(
     	.clk             (clk               ),
         .resetn          (resetn            ),
         .ready           (fu_rdy[3]         ),
+        .dcache_miss     (dcache_miss       ),
         .op              (op[3]             ),
         .inst_status     (inst_status[iptr[3]]),
         .rdata1          (rdata1[3]         ),

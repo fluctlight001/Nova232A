@@ -177,7 +177,7 @@ module FU_HILO (
                     op_div ? div_result[31:0] : 32'b0;
 
     assign cb_we = ~busy & |r_inst_status[`OP];
-    assign we = ~busy & r_inst_status[`WE];
+    assign rf_we = ~busy & r_inst_status[`WE];
     assign waddr = r_inst_status[`ADDR];
     assign wdata = inst_mflo ? src2 : inst_mfhi ? src2 : inst_mtlo ? src1 : lo_o;
     assign extra_wdata = inst_mthi ? src1 : hi_o;

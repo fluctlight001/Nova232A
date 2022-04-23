@@ -103,16 +103,17 @@ module mycpu_top(
     wire [31:0] uncache_rdata;
 
     //ctrl 
-    wire stallreq_from_out;
+    // wire stallreq_from_out;
     wire stallreq_from_icache;
     wire stallreq_from_dcache;
     wire stallreq_from_uncache;
-    assign stallreq_from_out = stallreq_from_icache | stallreq_from_dcache | stallreq_from_uncache;
+    // assign stallreq_from_out = stallreq_from_icache | stallreq_from_dcache | stallreq_from_uncache;
     mycpu_core u_mycpu_core(
     	.clk               (aclk              ),
         .resetn            (aresetn           ),
         .int               (ext_int           ),
-        .stallreq_from_out (stallreq_from_out ),
+        .stallreq_from_i   (stallreq_from_icache ),
+        .stallreq_from_d   (stallreq_from_dcache | stallreq_from_uncache),
         .inst_sram_en      (inst_sram_en      ),
         .inst_sram_wen     (inst_sram_wen     ),
         .inst_sram_addr    (inst_sram_addr_v  ),
@@ -209,7 +210,7 @@ module mycpu_top(
         .cached     (1'b1     ),
         .sram_en    (inst_sram_en    ),
         .sram_wen   (inst_sram_wen   ),
-        .sram_addr  (inst_sram_addr_v  ),
+        .sram_addr  (inst_sram_addr  ),
         .refresh    (icache_refresh    ),
         .miss       (icache_miss       ),
         .axi_raddr  (icache_raddr  ),
@@ -228,7 +229,7 @@ module mycpu_top(
         .cached        (1'b1        ),
         .sram_en       (inst_sram_en       ),
         .sram_wen      (inst_sram_wen      ),
-        .sram_addr     (inst_sram_addr_v     ),
+        .sram_addr     (inst_sram_addr     ),
         .sram_wdata    (inst_sram_wdata    ),
         .sram_rdata    (inst_sram_rdata    ),
         .refresh       (icache_refresh       ),
@@ -236,10 +237,12 @@ module mycpu_top(
         .cacheline_old (icache_cacheline_old )
     );
     
-
+    wire [31:0] dcache_temp_rdata;
+    wire [31:0] uncache_temp_rdata;
     mmu u1_mmu(
     	.addr_i (data_sram_addr_v ),
-        .addr_o (data_sram_addr   )
+        .addr_o (data_sram_addr   ),
+        .cache_v(dcache_cached)
     );
     
     cache_tag_v5 u_dcache_tag(
@@ -250,7 +253,7 @@ module mycpu_top(
         .cached     (dcache_cached     ),
         .sram_en    (data_sram_en    ),
         .sram_wen   (data_sram_wen   ),
-        .sram_addr  (data_sram_addr_v  ),
+        .sram_addr  (data_sram_addr  ),
         .refresh    (dcache_refresh    ),
         .miss       (dcache_miss       ),
         .axi_raddr  (dcache_raddr  ),
@@ -269,7 +272,7 @@ module mycpu_top(
         .cached        (dcache_cached       ),
         .sram_en       (data_sram_en        ),
         .sram_wen      (data_sram_wen       ),
-        .sram_addr     (data_sram_addr_v    ),
+        .sram_addr     (data_sram_addr    ),
         .sram_wdata    (data_sram_wdata     ),
         .sram_rdata    (dcache_temp_rdata   ),
         .refresh       (dcache_refresh      ),
@@ -284,7 +287,7 @@ module mycpu_top(
         .cached    (dcache_cached    ),
         .sram_en   (data_sram_en   ),
         .sram_wen  (data_sram_wen  ),
-        .sram_addr (data_sram_addr_v ),
+        .sram_addr (data_sram_addr ),
         .refresh   (uncache_refresh   ),
         .axi_en    (uncache_en    ),
         .axi_wsel  (uncache_wen  ),
