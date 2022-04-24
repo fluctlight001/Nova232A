@@ -12,24 +12,42 @@ module decoder (
     output wire inst_valid,
     output wire [`ID_TO_SB_WD-1:0] id_to_sb_bus
 );
-
+    reg [31:0] easy_pc;
     reg [31:0] sram_pc, pc_r, inst_sram_rdata_r;
     wire br_e;
     wire [31:0] br_addr;
     assign {br_e, br_addr} = br_bus;
 
+    wire cmp;
+    reg cmp_valid;
+    reg [31:0] r_br_addr;
+
+    wire easy_match;
+    assign easy_match = easy_pc == pc_r ? 1'b1 : 1'b0;
+
+    always @ (posedge clk) begin
+        if (!resetn) begin
+            easy_pc <= 32'hbfc0_0000;
+        end
+        // else if (stall) begin
+            
+        // end
+        else if (br_e) begin
+            easy_pc <= br_bus;
+        end
+        else if (inst_valid) begin
+            easy_pc <= easy_pc + 32'd4;
+        end
+    end
+
     always @ (posedge clk) begin
         if (!resetn | br_e) begin
             sram_pc <= 32'b0;
         end
-        else begin
+        else if (!stall) begin
             sram_pc <= pc;
         end
     end
-
-    wire cmp;
-    reg cmp_valid;
-    reg [31:0] r_br_addr;
 
     always @ (posedge clk) begin
         if (!resetn) begin
@@ -59,7 +77,7 @@ module decoder (
     end
 
     always @ (posedge clk) begin
-        if (!resetn | !cmp | br_e) begin
+        if (!resetn | !cmp ) begin
             pc_r <= 32'b0;
             inst_sram_rdata_r <= 32'b0;
             flag <= 1'b0;
@@ -379,7 +397,7 @@ module decoder (
         pc_r        // 31:0
     };
 
-    assign inst_valid = (|pc_r) & 
+    assign inst_valid = (|pc_r) & (~stall) & easy_match &
                         (inst_add | inst_addi | inst_addu | inst_addiu
                         | inst_sub | inst_subu | inst_slt | inst_slti 
                         | inst_sltu | inst_sltiu | inst_div | inst_divu

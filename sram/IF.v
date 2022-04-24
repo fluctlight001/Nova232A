@@ -41,7 +41,7 @@ module IF (
             pc_reg <= r_br_e ? r_br_addr : br_e ? br_addr : next_pc;
             r_br_e <= 1'b0;
         end
-        else begin
+        else if (br_e) begin
             r_br_e <= br_e;
             r_br_addr <= br_addr;
         end
