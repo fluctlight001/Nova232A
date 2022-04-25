@@ -662,7 +662,6 @@ module scoreboard(
         .wdata       (wdata[1]              )
     );
     
-
     FU_BRU u2_FU(
     	.clk         (clk                   ),
         .resetn      (resetn                ),

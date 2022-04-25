@@ -32,7 +32,6 @@
 `define Stop 1'b1
 `define ZeroWord 32'b0
 
-
 //除法div
 `define DivFree 2'b00
 `define DivByZero 2'b01
@@ -58,3 +57,12 @@
 `define CACHELINE_WIDTH 512
 `define HIT_WIDTH 2
 `define LRU_WIDTH 1
+
+//CP0寄存器地址
+`define CP0_REG_COUNT       5'b01001        //可读写
+`define CP0_REG_COMPARE     5'b01011        //可读写
+`define CP0_REG_STATUS      5'b01100        //可读写
+`define CP0_REG_CAUSE       5'b01101        //只读
+`define CP0_REG_EPC         5'b01110        //可读写
+`define CP0_REG_CONFIG      5'b10000        //只读
+`define CP0_REG_BADADDR     5'b01000

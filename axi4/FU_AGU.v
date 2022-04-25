@@ -21,6 +21,10 @@ module FU_AGU(
     output wire [31:0] data_sram_wdata,
     input wire [31:0] data_sram_rdata
 );
+    wire cp0_en;
+    wire cp0_wen;
+    wire [4:0] cp0_addr;
+    wire [31:0] cp0_wdata, cp0_rdata;
 
     reg [11:0] r_op;
     reg [31:0] r_rdata1, r_rdata2;
@@ -50,10 +54,11 @@ module FU_AGU(
         end
     end
 
-    wire ex_lb, ex_lbu, ex_lh, ex_lhu, ex_lw, ex_sb, ex_sh, ex_sw;
-    wire [3:0] ex_useless;
+    wire ex_mfc0, ex_mtc0, ex_lb, ex_lbu, ex_lh, ex_lhu, ex_lw, ex_sb, ex_sh, ex_sw;
+    wire [1:0] ex_useless;
     assign {
         ex_useless,
+        ex_mfc0, ex_mtc0,
         ex_lb, ex_lbu, ex_lh, ex_lhu, ex_lw, ex_sb, ex_sh, ex_sw
     } = r_op;
 
@@ -80,12 +85,25 @@ module FU_AGU(
                                 {32{ex_sh}} & {2{r_rdata2[15:0]}} |
                                 {32{ex_sw}} & r_rdata2;
 
+    assign cp0_en = ex_mfc0 | ex_mtc0;
+    assign cp0_wen = ex_mtc0;
+    assign cp0_addr = {5{ex_mfc0|ex_mtc0}} & r_inst_status_ex[`REG1];
+    assign cp0_wdata = r_rdata2;
+
+
+
+
+
+                                
+    // mem state
     reg [`INST_STATE_WD-1:0] r_inst_status_mem;
     reg [3:0] r_data_sram_sel;
+    reg [31:0] r_cp0_rdata;
     always @ (posedge clk) begin
         if (!resetn) begin
             r_inst_status_mem <= `INST_STATE_WD'b0;
             r_data_sram_sel <= 4'b0;
+            r_cp0_rdata <= 32'b0;
         end
         else if (dcache_miss) begin
             
@@ -93,13 +111,15 @@ module FU_AGU(
         else begin
             r_inst_status_mem <= r_inst_status_ex;
             r_data_sram_sel <= data_sram_sel;
+            r_cp0_rdata <= cp0_rdata;
         end
     end
 
-    wire [3:0] mem_useless;
-    wire mem_lb, mem_lbu, mem_lh, mem_lhu, mem_lw, mem_sb, mem_sh, mem_sw;
+    wire [1:0] mem_useless;
+    wire mem_mfc0, mem_mtc0, mem_lb, mem_lbu, mem_lh, mem_lhu, mem_lw, mem_sb, mem_sh, mem_sw;
     assign {
         mem_useless,
+        mem_mfc0, mem_mtc0,
         mem_lb, mem_lbu, mem_lh, mem_lhu, mem_lw, mem_sb, mem_sh, mem_sw
     } = r_inst_status_mem[`OP];
 
@@ -124,5 +144,16 @@ module FU_AGU(
 
     assign cb_we = dcache_miss ? 1'b0 : |r_inst_status_mem[`OP];
     assign rf_we = dcache_miss ? 1'b0 : r_inst_status_mem[`WE];
-    assign wdata = mem_result;
+    assign wdata = mem_mfc0 ? r_cp0_rdata : mem_result;
+
+    cp0_reg u_cp0_reg(
+    	.clk       (clk       ),
+        .resetn    (resetn    ),
+        .cp0_en    (cp0_en    ),
+        .cp0_wen   (cp0_wen   ),
+        .cp0_addr  (cp0_addr  ),
+        .cp0_wdata (cp0_wdata ),
+        .cp0_rdata (cp0_rdata )
+    );
+    
 endmodule
