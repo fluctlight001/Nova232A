@@ -63,7 +63,7 @@ module scoreboard(
     wire [4:0] rest;
     assign rest = wptr_next[4] == rptr_next[4] ? (wptr_next - rptr_next) : ({1'b1,wptr_next[3:0]} - {1'b0,rptr_next[3:0]});
     assign full_next = rest > 15 ? 1 : 0;
-    assign stallreq = full_next;
+    assign stallreq = full;
     // assign flush = br_e;
     
 
@@ -100,7 +100,7 @@ module scoreboard(
     //  retire // commit
     wire [3:0] raddr;
     assign raddr = rptr[3:0];
-    assign retire_en[0] = valid_inst[raddr] & writeback[raddr];
+    assign retire_en[0] = valid_inst[raddr] & writeback[raddr] & (~br_e_r[raddr] | valid_inst[raddr+1'b1]);
     assign retire_en[1] = 1'b0; // inst_status[rptr+1][`CPLT] & retire_en[0];
     assign retire_en[2] = 1'b0; // inst_status[rptr+2][`CPLT] & retire_en[1];
     assign retire_en[3] = 1'b0; // inst_status[rptr+3][`CPLT] & retire_en[2];
@@ -166,13 +166,40 @@ module scoreboard(
                 inst_status[waddr] <= {wptr, inst1};
             end
             else if (br_bus[32]) begin
-                valid_inst <= 16'b0 ;
-                valid_inst[raddr+1'b1] <= 1'b1;
-                dispatch[raddr+2'd2] <= 1'b0;
-                issue[raddr+2'd2] <= 1'b0;
-                execute[raddr+2'd2] <= 1'b0;
-                writeback[raddr+2'd2] <= 1'b0;
-                inst_status[raddr+2'd2] <= `INST_STATE_WD'b0;
+                // valid_inst <= 16'b0 ;
+                // valid_inst[raddr+1'b1] <= 1'b1;
+                // dispatch[raddr+2'd2] <= 1'b0;
+                // issue[raddr+2'd2] <= 1'b0;
+                // execute[raddr+2'd2] <= 1'b0;
+                // writeback[raddr+2'd2] <= 1'b0;
+                // inst_status[raddr+2'd2] <= `INST_STATE_WD'b0;
+                inst_status[ 0] <= `INST_STATE_WD'b0;
+                inst_status[ 1] <= `INST_STATE_WD'b0;
+                inst_status[ 2] <= `INST_STATE_WD'b0;
+                inst_status[ 3] <= `INST_STATE_WD'b0;
+                inst_status[ 4] <= `INST_STATE_WD'b0;
+                inst_status[ 5] <= `INST_STATE_WD'b0;
+                inst_status[ 6] <= `INST_STATE_WD'b0;
+                inst_status[ 7] <= `INST_STATE_WD'b0;
+                inst_status[ 8] <= `INST_STATE_WD'b0;
+                inst_status[ 9] <= `INST_STATE_WD'b0;
+                inst_status[10] <= `INST_STATE_WD'b0;
+                inst_status[11] <= `INST_STATE_WD'b0;
+                inst_status[12] <= `INST_STATE_WD'b0;
+                inst_status[13] <= `INST_STATE_WD'b0;
+                inst_status[14] <= `INST_STATE_WD'b0;
+                inst_status[15] <= `INST_STATE_WD'b0;
+                valid_inst <= 16'b0;
+                dispatch <= 16'b0;
+                issue <= 16'b0;
+                execute <= 16'b0;
+                writeback <= 16'b0;
+                inst_status[raddr+1'b1] <= inst_status[raddr+1'b1];
+                valid_inst[raddr+1'b1] <= valid_inst[raddr+1'b1];
+                dispatch[raddr+1'b1] <= dispatch[raddr+1'b1];
+                issue[raddr+1'b1] <= issue[raddr+1'b1];
+                execute[raddr+1'b1] <= execute[raddr+1'b1];
+                writeback[raddr+1'b1] <= writeback[raddr+1'b1];
             end
             if (dispatch_ok) begin
                 dispatch[dptr] <= 1'b1;
