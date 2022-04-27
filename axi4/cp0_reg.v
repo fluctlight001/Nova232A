@@ -19,7 +19,10 @@ module cp0_reg(
         else begin
             tick <= ~tick;
         end
-        if (cp0_wen && cp0_addr == `CP0_REG_COUNT)begin
+        if (!resetn) begin
+            c0_count <= 32'b0;
+        end
+        else if (cp0_wen && cp0_addr == `CP0_REG_COUNT)begin
             c0_count <= cp0_wdata;
         end
         else if (tick) begin

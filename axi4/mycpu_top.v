@@ -104,6 +104,7 @@ module mycpu_top(
 
     //ctrl 
     // wire stallreq_from_out;
+    wire stallreq_from_axi;
     wire stallreq_from_icache;
     wire stallreq_from_dcache;
     wire stallreq_from_uncache;
@@ -112,8 +113,8 @@ module mycpu_top(
     	.clk               (aclk              ),
         .resetn            (aresetn           ),
         .int               (ext_int           ),
-        .stallreq_from_i   (stallreq_from_icache ),
-        .stallreq_from_d   (stallreq_from_dcache | stallreq_from_uncache),
+        .stallreq_from_i   (stallreq_from_icache | stallreq_from_dcache | stallreq_from_uncache | stallreq_from_axi),
+        .stallreq_from_d   (stallreq_from_dcache | stallreq_from_uncache | stallreq_from_axi),
         .inst_sram_en      (inst_sram_en      ),
         .inst_sram_wen     (inst_sram_wen     ),
         .inst_sram_addr    (inst_sram_addr_v  ),
@@ -158,6 +159,8 @@ module mycpu_top(
         .uncache_wdata        (data_sram_wdata      ),
         .uncache_rdata        (uncache_rdata        ),
         .uncache_refresh      (uncache_refresh      ),
+
+        .stallreq             (stallreq_from_axi    ),
 
         .arid                 (arid                 ),
         .araddr               (araddr               ),

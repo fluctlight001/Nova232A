@@ -37,6 +37,8 @@ module axi_control_v5(
     output reg [31:0] uncache_rdata,
     output reg uncache_refresh,
 
+    output wire stallreq,
+
     //总线侧接口
     //读地址通道信号
     output reg [3:0]	    arid,//读地址ID，用来标志一组写信号
@@ -107,6 +109,7 @@ module axi_control_v5(
 
     reg [`STAGE_WIDTH-1:0] stage;
     reg [`STAGE_WIDTH-1:0] stage_w;
+    assign stallreq = ~stage_w[0];
     always @ (posedge clk) begin
         if (!rstn) begin
             arid <= 4'b0000;

@@ -12,8 +12,10 @@ module FU_AGU(
 
     output wire cb_we,
     output wire rf_we,
+    output wire store_en,
+    output wire [3:0] store_sel,
     output wire [31:0] wdata,
-    // output wire [31:0] extra_wdata,
+    output wire [31:0] extra_wdata,
 
     output wire data_sram_en,
     output wire [3:0] data_sram_wen,
@@ -75,15 +77,16 @@ module FU_AGU(
         .out (byte_sel      )
     );
 
-    assign data_sram_en = ex_lb | ex_lbu | ex_lh | ex_lhu | ex_lw | ex_sb | ex_sh | ex_sw;
+    assign data_sram_en = ex_lb | ex_lbu | ex_lh | ex_lhu | ex_lw;
     assign data_sram_sel =  ex_sb | ex_lb | ex_lbu ? byte_sel :
                             ex_sh | ex_lh | ex_lhu ? {{2{byte_sel[2]}},{2{byte_sel[0]}}} :
                             ex_sw | ex_lw ? 4'b1111 : 4'b0000;
-    assign data_sram_wen = {4{ex_sw | ex_sb | ex_sh}} & data_sram_sel;
-    assign data_sram_addr = vaddr;
-    assign data_sram_wdata =    {32{ex_sb}} & {4{r_rdata2[7:0]}} |
-                                {32{ex_sh}} & {2{r_rdata2[15:0]}} |
-                                {32{ex_sw}} & r_rdata2;
+    assign data_sram_wen = 4'b0;
+    assign data_sram_addr = ex_mtc0 | ex_mfc0 | ex_sb | ex_sh | ex_sw ? 32'b0 : vaddr;
+    assign data_sram_wdata = 32'b0;
+                                // {32{ex_sb}} & {4{r_rdata2[7:0]}} |
+                                // {32{ex_sh}} & {2{r_rdata2[15:0]}} |
+                                // {32{ex_sw}} & r_rdata2;
 
     assign cp0_en = ex_mfc0 | ex_mtc0;
     assign cp0_wen = ex_mtc0;
@@ -99,11 +102,15 @@ module FU_AGU(
     reg [`INST_STATE_WD-1:0] r_inst_status_mem;
     reg [3:0] r_data_sram_sel;
     reg [31:0] r_cp0_rdata;
+    reg [31:0] r_vaddr;
+    reg [31:0] r_data_sram_wdata;
     always @ (posedge clk) begin
         if (!resetn) begin
             r_inst_status_mem <= `INST_STATE_WD'b0;
             r_data_sram_sel <= 4'b0;
             r_cp0_rdata <= 32'b0;
+            r_vaddr <= 32'b0;
+            r_data_sram_wdata <= 32'b0;
         end
         else if (dcache_miss) begin
             
@@ -112,6 +119,10 @@ module FU_AGU(
             r_inst_status_mem <= r_inst_status_ex;
             r_data_sram_sel <= data_sram_sel;
             r_cp0_rdata <= cp0_rdata;
+            r_vaddr <= vaddr;
+            r_data_sram_wdata <= {32{ex_sb}} & {4{r_rdata2[7:0]}} |
+                                {32{ex_sh}} & {2{r_rdata2[15:0]}} |
+                                {32{ex_sw}} & r_rdata2;
         end
     end
 
@@ -144,7 +155,10 @@ module FU_AGU(
 
     assign cb_we = dcache_miss ? 1'b0 : |r_inst_status_mem[`OP];
     assign rf_we = dcache_miss ? 1'b0 : r_inst_status_mem[`WE];
-    assign wdata = mem_mfc0 ? r_cp0_rdata : mem_result;
+    assign store_en = mem_sb | mem_sh | mem_sw;
+    assign store_sel = {4{mem_sb|mem_sh|mem_sw}} & r_data_sram_sel;
+    assign wdata = (mem_sb|mem_sh|mem_sw) ? r_data_sram_wdata : mem_mfc0 ? r_cp0_rdata : mem_result;
+    assign extra_wdata = r_vaddr;
 
     cp0_reg u_cp0_reg(
     	.clk       (clk       ),

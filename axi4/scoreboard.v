@@ -38,15 +38,24 @@ module scoreboard(
     reg [31:0] cb_extra [15:0];
     reg [15:0] rf_we_r;
     reg [15:0] br_e_r;
+    reg [15:0] st_e_r;
+    reg [3:0] st_sel_r [15:0];
     
     wire [7:0] cb_we;
     wire [7:0] rf_we;
     wire br_e;
+    wire store_en;
+    wire [3:0] store_sel;
     wire [31:0] wdata [7:0];
     wire [31:0] extra_wdata [7:0];
     wire dispatch_ok;
     wire [7:0] wb_ok;
     
+    wire agu_sram_en;
+    wire [3:0] agu_sram_wen;
+    wire [31:0] agu_sram_addr;
+    wire [31:0] agu_sram_wdata;
+    wire [31:0] agu_sram_rdata;
 
     reg [4:0] wptr, rptr;
     reg [3:0] dptr;
@@ -62,7 +71,7 @@ module scoreboard(
     wire full_next;
     wire [4:0] rest;
     assign rest = wptr_next[4] == rptr_next[4] ? (wptr_next - rptr_next) : ({1'b1,wptr_next[3:0]} - {1'b0,rptr_next[3:0]});
-    assign full_next = rest > 15 ? 1 : 0;
+    assign full_next = rest > 14 ? 1 : 0;
     assign stallreq = full;
     // assign flush = br_e;
     
@@ -89,18 +98,20 @@ module scoreboard(
         end
     end
 
+
+    wire [3:0] raddr;
     always @ (posedge clk) begin
         if (!resetn) begin
             rptr <= 0;
         end
-        else begin
+        else if (~(dcache_miss&st_e_r[raddr])) begin
             rptr <= rptr_next;
         end
     end
     //  retire // commit
-    wire [3:0] raddr;
+    
     assign raddr = rptr[3:0];
-    assign retire_en[0] = valid_inst[raddr] & writeback[raddr] & (~br_e_r[raddr] | valid_inst[raddr+1'b1]);
+    assign retire_en[0] = valid_inst[raddr] & writeback[raddr] & (~br_e_r[raddr] | (valid_inst[raddr+1'b1]&writeback[raddr+1'b1]));
     assign retire_en[1] = 1'b0; // inst_status[rptr+1][`CPLT] & retire_en[0];
     assign retire_en[2] = 1'b0; // inst_status[rptr+2][`CPLT] & retire_en[1];
     assign retire_en[3] = 1'b0; // inst_status[rptr+3][`CPLT] & retire_en[2];
@@ -234,7 +245,7 @@ module scoreboard(
             if (valid_inst[iptr[6]] & wb_ok[6] & execute[iptr[6]]) writeback[iptr[6]] <= 1'b1;
             if (valid_inst[iptr[7]] & wb_ok[7] & execute[iptr[7]]) writeback[iptr[7]] <= 1'b1;
 
-            if (retire_en[0]) begin
+            if (retire_en[0] & ~(dcache_miss&st_e_r[raddr])) begin
                 valid_inst[raddr] <= 1'b0;
                 dispatch[raddr] <= 1'b0;
                 issue[raddr] <= 1'b0;
@@ -358,7 +369,7 @@ module scoreboard(
                 {busy[2],op[2],r[2],r1[2],r2[2],t1[2],t2[2]} <= {1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
                 iptr[2] <= 0;
             end
-            else if (valid_inst[iptr[3]] & writeback[iptr[3]] & iptr[3]==raddr & retire_en[0] & busy[3]) begin
+            else if (valid_inst[iptr[3]] & writeback[iptr[3]] & iptr[3]==raddr & retire_en[0] & busy[3] & ~(dcache_miss&st_e_r[raddr])) begin
                 // t1[1] <= t1[1] == `ALU1 ? `NULL : t1[1];
                 t1[0] <= t1[0] == `AGU ? `NULL : t1[0];
                 t2[0] <= t2[0] == `AGU ? `NULL : t2[0];
@@ -688,12 +699,15 @@ module scoreboard(
         .rdata2          (rdata2[3]         ),
         .cb_we           (cb_we[3]          ),
         .rf_we           (rf_we[3]          ),
+        .store_en        (store_en          ),
+        .store_sel       (store_sel         ),
         .wdata           (wdata[3]          ),
-        .data_sram_en    (data_sram_en      ),
-        .data_sram_wen   (data_sram_wen     ),
-        .data_sram_addr  (data_sram_addr    ),
-        .data_sram_wdata (data_sram_wdata   ),
-        .data_sram_rdata (data_sram_rdata   )
+        .extra_wdata     (extra_wdata[3]    ),
+        .data_sram_en    (agu_sram_en       ),
+        .data_sram_wen   (agu_sram_wen      ),
+        .data_sram_addr  (agu_sram_addr     ),
+        .data_sram_wdata (agu_sram_wdata    ),
+        .data_sram_rdata (data_sram_rdata    )
     );
     
     FU_HILO u4_FU(
@@ -742,152 +756,148 @@ module scoreboard(
 
     always @ (posedge clk) begin
         if (!resetn) begin
-            cb[ 0] <= 32'b0; cb_extra[ 0] <= 32'b0;
-            cb[ 1] <= 32'b0; cb_extra[ 1] <= 32'b0;
-            cb[ 2] <= 32'b0; cb_extra[ 2] <= 32'b0;
-            cb[ 3] <= 32'b0; cb_extra[ 3] <= 32'b0;
-            cb[ 4] <= 32'b0; cb_extra[ 4] <= 32'b0;
-            cb[ 5] <= 32'b0; cb_extra[ 5] <= 32'b0;
-            cb[ 6] <= 32'b0; cb_extra[ 6] <= 32'b0;
-            cb[ 7] <= 32'b0; cb_extra[ 7] <= 32'b0;
-            cb[ 8] <= 32'b0; cb_extra[ 8] <= 32'b0;
-            cb[ 9] <= 32'b0; cb_extra[ 9] <= 32'b0;
-            cb[10] <= 32'b0; cb_extra[10] <= 32'b0;
-            cb[11] <= 32'b0; cb_extra[11] <= 32'b0;
-            cb[12] <= 32'b0; cb_extra[12] <= 32'b0;
-            cb[13] <= 32'b0; cb_extra[13] <= 32'b0;
-            cb[14] <= 32'b0; cb_extra[14] <= 32'b0;
-            cb[15] <= 32'b0; cb_extra[15] <= 32'b0;
-            cb[16] <= 32'b0; cb_extra[16] <= 32'b0;
-            cb[17] <= 32'b0; cb_extra[17] <= 32'b0;
-            cb[18] <= 32'b0; cb_extra[18] <= 32'b0;
-            cb[19] <= 32'b0; cb_extra[19] <= 32'b0;
-            cb[20] <= 32'b0; cb_extra[20] <= 32'b0;
-            cb[21] <= 32'b0; cb_extra[21] <= 32'b0;
-            cb[22] <= 32'b0; cb_extra[22] <= 32'b0;
-            cb[23] <= 32'b0; cb_extra[23] <= 32'b0;
-            cb[24] <= 32'b0; cb_extra[24] <= 32'b0;
-            cb[25] <= 32'b0; cb_extra[25] <= 32'b0;
-            cb[26] <= 32'b0; cb_extra[26] <= 32'b0;
-            cb[27] <= 32'b0; cb_extra[27] <= 32'b0;
-            cb[28] <= 32'b0; cb_extra[28] <= 32'b0;
-            cb[29] <= 32'b0; cb_extra[29] <= 32'b0;
-            cb[30] <= 32'b0; cb_extra[30] <= 32'b0;
-            cb[31] <= 32'b0; cb_extra[31] <= 32'b0;
+            cb[ 0] <= 32'b0; cb_extra[ 0] <= 32'b0; st_sel_r[ 0] <= 4'b0;
+            cb[ 1] <= 32'b0; cb_extra[ 1] <= 32'b0; st_sel_r[ 1] <= 4'b0;
+            cb[ 2] <= 32'b0; cb_extra[ 2] <= 32'b0; st_sel_r[ 2] <= 4'b0;
+            cb[ 3] <= 32'b0; cb_extra[ 3] <= 32'b0; st_sel_r[ 3] <= 4'b0;
+            cb[ 4] <= 32'b0; cb_extra[ 4] <= 32'b0; st_sel_r[ 4] <= 4'b0;
+            cb[ 5] <= 32'b0; cb_extra[ 5] <= 32'b0; st_sel_r[ 5] <= 4'b0;
+            cb[ 6] <= 32'b0; cb_extra[ 6] <= 32'b0; st_sel_r[ 6] <= 4'b0;
+            cb[ 7] <= 32'b0; cb_extra[ 7] <= 32'b0; st_sel_r[ 7] <= 4'b0;
+            cb[ 8] <= 32'b0; cb_extra[ 8] <= 32'b0; st_sel_r[ 8] <= 4'b0;
+            cb[ 9] <= 32'b0; cb_extra[ 9] <= 32'b0; st_sel_r[ 9] <= 4'b0;
+            cb[10] <= 32'b0; cb_extra[10] <= 32'b0; st_sel_r[10] <= 4'b0;
+            cb[11] <= 32'b0; cb_extra[11] <= 32'b0; st_sel_r[11] <= 4'b0;
+            cb[12] <= 32'b0; cb_extra[12] <= 32'b0; st_sel_r[12] <= 4'b0;
+            cb[13] <= 32'b0; cb_extra[13] <= 32'b0; st_sel_r[13] <= 4'b0;
+            cb[14] <= 32'b0; cb_extra[14] <= 32'b0; st_sel_r[14] <= 4'b0;
+            cb[15] <= 32'b0; cb_extra[15] <= 32'b0; st_sel_r[15] <= 4'b0;
             rf_we_r <= 16'b0;
             br_e_r <= 16'b0;
+            st_e_r <= 16'b0;
         end
         else begin
             if (cb_we[0]) {rf_we_r[iptr[0]], cb[iptr[0]]} <= {rf_we[0], wdata[0]};
             if (cb_we[1]) {rf_we_r[iptr[1]], cb[iptr[1]]} <= {rf_we[1], wdata[1]};
             if (cb_we[2]) {br_e_r[iptr[2]], rf_we_r[iptr[2]], cb[iptr[2]], cb_extra[iptr[2]]} <= {br_e, rf_we[2], wdata[2], extra_wdata[2]};
-            if (cb_we[3]) {rf_we_r[iptr[3]], cb[iptr[3]]} <= {rf_we[3], wdata[3]};
+            if (cb_we[3]) {st_e_r[iptr[3]], st_sel_r[iptr[3]], rf_we_r[iptr[3]], cb[iptr[3]], cb_extra[iptr[3]]} <= {store_en, store_sel, rf_we[3], wdata[3], extra_wdata[3]};
             if (cb_we[4]) {rf_we_r[iptr[4]], cb[iptr[4]], cb_extra[iptr[4]]} <= {rf_we[4], wdata[4], extra_wdata[4]};
             if (cb_we[5]) {rf_we_r[iptr[5]], cb[iptr[5]]} <= {rf_we[5], wdata[5]};
             if (cb_we[6]) {rf_we_r[iptr[6]], cb[iptr[6]]} <= {rf_we[6], wdata[6]};
-            if (br_bus[32]) br_e_r <= 16'b0;
+            if (br_bus[32]) begin
+                br_e_r <= 16'b0;
+                st_e_r <= 16'b0;
+                st_e_r[raddr+1'b1] <= st_e_r[raddr+1'b1];
+            end 
+            if (retire_en[0] & ~(dcache_miss&st_e_r[raddr])) st_e_r[raddr] <= 1'b0;
         end
     end
 
     assign br_bus = {br_e_r[raddr]&retire_en[0], {32{retire_en[0]}}&cb_extra[raddr]};
+
+    assign data_sram_en = (retire_en[0] & st_e_r[raddr]) ? 1'b1 : agu_sram_en;
+    assign data_sram_wen = (retire_en[0] & st_e_r[raddr]) ? st_sel_r[raddr] : agu_sram_wen;
+    assign data_sram_addr = (retire_en[0] & st_e_r[raddr]) ? cb_extra[raddr] : agu_sram_addr;
+    assign data_sram_wdata = (retire_en[0] & st_e_r[raddr]) ? cb[raddr] : agu_sram_wdata;
+
     
-    assign wb_ok[0] = ~(r[0]==r1[1] & t1[1]!=`ALU1 |
-                        r[0]==r2[1] & t2[1]!=`ALU1 |
-                        r[0]==r1[2] & t1[2]!=`ALU1 |
-                        r[0]==r2[2] & t2[2]!=`ALU1 |
-                        r[0]==r1[3] & t1[3]!=`ALU1 |
-                        r[0]==r2[3] & t2[3]!=`ALU1 |
-                        r[0]==r1[4] & t1[4]!=`ALU1 |
-                        r[0]==r2[4] & t2[4]!=`ALU1 |
-                        r[0]==r1[5] & t1[5]!=`ALU1 |
-                        r[0]==r2[5] & t2[5]!=`ALU1 |
-                        r[0]==r1[6] & t1[6]!=`ALU1 |
-                        r[0]==r2[6] & t2[6]!=`ALU1 |
-                        r[0]==r1[7] & t1[7]!=`ALU1 |
-                        r[0]==r2[7] & t2[7]!=`ALU1 ) | r[0] == 0;
-    assign wb_ok[1] = ~(r[1]==r1[0] & t1[0]!=`ALU2 |
-                        r[1]==r2[0] & t2[0]!=`ALU2 |
-                        r[1]==r1[2] & t1[2]!=`ALU2 |
-                        r[1]==r2[2] & t2[2]!=`ALU2 |
-                        r[1]==r1[3] & t1[3]!=`ALU2 |
-                        r[1]==r2[3] & t2[3]!=`ALU2 |
-                        r[1]==r1[4] & t1[4]!=`ALU2 |
-                        r[1]==r2[4] & t2[4]!=`ALU2 |
-                        r[1]==r1[5] & t1[5]!=`ALU2 |
-                        r[1]==r2[5] & t2[5]!=`ALU2 |
-                        r[1]==r1[6] & t1[6]!=`ALU2 |
-                        r[1]==r2[6] & t2[6]!=`ALU2 |
-                        r[1]==r1[7] & t1[7]!=`ALU2 |
-                        r[1]==r2[7] & t2[7]!=`ALU2 ) | r[1] == 0;
-    assign wb_ok[2] = ~(r[2]==r1[0] & t1[0]!=`BRU |
-                        r[2]==r2[0] & t2[0]!=`BRU |
-                        r[2]==r1[1] & t1[1]!=`BRU |
-                        r[2]==r2[1] & t2[1]!=`BRU |
-                        r[2]==r1[3] & t1[3]!=`BRU |
-                        r[2]==r2[3] & t2[3]!=`BRU |
-                        r[2]==r1[4] & t1[4]!=`BRU |
-                        r[2]==r2[4] & t2[4]!=`BRU |
-                        r[2]==r1[5] & t1[5]!=`BRU |
-                        r[2]==r2[5] & t2[5]!=`BRU |
-                        r[2]==r1[6] & t1[6]!=`BRU |
-                        r[2]==r2[6] & t2[6]!=`BRU |
-                        r[2]==r1[7] & t1[7]!=`BRU |
-                        r[2]==r2[7] & t2[7]!=`BRU ) | r[2] == 0;
-    assign wb_ok[3] = ~(r[3]==r1[0] & t1[0]!=`AGU |
-                        r[3]==r2[0] & t2[0]!=`AGU |
-                        r[3]==r1[1] & t1[1]!=`AGU |
-                        r[3]==r2[1] & t2[1]!=`AGU |
-                        r[3]==r1[2] & t1[2]!=`AGU |
-                        r[3]==r2[2] & t2[2]!=`AGU |
-                        r[3]==r1[4] & t1[4]!=`AGU |
-                        r[3]==r2[4] & t2[4]!=`AGU |
-                        r[3]==r1[5] & t1[5]!=`AGU |
-                        r[3]==r2[5] & t2[5]!=`AGU |
-                        r[3]==r1[6] & t1[6]!=`AGU |
-                        r[3]==r2[6] & t2[6]!=`AGU |
-                        r[3]==r1[7] & t1[7]!=`AGU |
-                        r[3]==r2[7] & t2[7]!=`AGU ) | r[3] == 0;
-    assign wb_ok[4] = ~(r[4]==r1[0] & t1[0]!=`HILO |
-                        r[4]==r2[0] & t2[0]!=`HILO |
-                        r[4]==r1[1] & t1[1]!=`HILO |
-                        r[4]==r2[1] & t2[1]!=`HILO |
-                        r[4]==r1[2] & t1[2]!=`HILO |
-                        r[4]==r2[2] & t2[2]!=`HILO |
-                        r[4]==r1[3] & t1[3]!=`HILO |
-                        r[4]==r2[3] & t2[3]!=`HILO |
-                        r[4]==r1[5] & t1[5]!=`HILO |
-                        r[4]==r2[5] & t2[5]!=`HILO |
-                        r[4]==r1[6] & t1[6]!=`HILO |
-                        r[4]==r2[6] & t2[6]!=`HILO |
-                        r[4]==r1[7] & t1[7]!=`HILO |
-                        r[4]==r2[7] & t2[7]!=`HILO ) | r[4] == 0;
-    assign wb_ok[5] = ~(r[5]==r1[0] & t1[0]!=`ALU3 |
-                        r[5]==r2[0] & t2[0]!=`ALU3 |
-                        r[5]==r1[1] & t1[1]!=`ALU3 |
-                        r[5]==r2[1] & t2[1]!=`ALU3 |
-                        r[5]==r1[2] & t1[2]!=`ALU3 |
-                        r[5]==r2[2] & t2[2]!=`ALU3 |
-                        r[5]==r1[3] & t1[3]!=`ALU3 |
-                        r[5]==r2[3] & t2[3]!=`ALU3 |
-                        r[5]==r1[4] & t1[4]!=`ALU3 |
-                        r[5]==r2[4] & t2[4]!=`ALU3 |
-                        r[5]==r1[6] & t1[6]!=`ALU3 |
-                        r[5]==r2[6] & t2[6]!=`ALU3 |
-                        r[5]==r1[7] & t1[7]!=`ALU3 |
-                        r[5]==r2[7] & t2[7]!=`ALU3 ) | r[5] == 0;
-    assign wb_ok[6] = ~(r[6]==r1[0] & t1[0]!=`ALU4 |
-                        r[6]==r2[0] & t2[0]!=`ALU4 |
-                        r[6]==r1[1] & t1[1]!=`ALU4 |
-                        r[6]==r2[1] & t2[1]!=`ALU4 |
-                        r[6]==r1[2] & t1[2]!=`ALU4 |
-                        r[6]==r2[2] & t2[2]!=`ALU4 |
-                        r[6]==r1[3] & t1[3]!=`ALU4 |
-                        r[6]==r2[3] & t2[3]!=`ALU4 |
-                        r[6]==r1[4] & t1[4]!=`ALU4 |
-                        r[6]==r2[4] & t2[4]!=`ALU4 |
-                        r[6]==r1[5] & t1[5]!=`ALU4 |
-                        r[6]==r2[5] & t2[5]!=`ALU4 |
-                        r[6]==r1[7] & t1[7]!=`ALU4 |
-                        r[6]==r2[7] & t2[7]!=`ALU4 ) | r[6] == 0;
+    assign wb_ok[0] = ~(r[0]==r1[1] & t1[1]!=`ALU1 & ~issue[iptr[1]] |
+                        r[0]==r2[1] & t2[1]!=`ALU1 & ~issue[iptr[1]] |
+                        r[0]==r1[2] & t1[2]!=`ALU1 & ~issue[iptr[2]] |
+                        r[0]==r2[2] & t2[2]!=`ALU1 & ~issue[iptr[2]] |
+                        r[0]==r1[3] & t1[3]!=`ALU1 & ~issue[iptr[3]] |
+                        r[0]==r2[3] & t2[3]!=`ALU1 & ~issue[iptr[3]] |
+                        r[0]==r1[4] & t1[4]!=`ALU1 & ~issue[iptr[4]] |
+                        r[0]==r2[4] & t2[4]!=`ALU1 & ~issue[iptr[4]] |
+                        r[0]==r1[5] & t1[5]!=`ALU1 & ~issue[iptr[5]] |
+                        r[0]==r2[5] & t2[5]!=`ALU1 & ~issue[iptr[5]] |
+                        r[0]==r1[6] & t1[6]!=`ALU1 & ~issue[iptr[6]] |
+                        r[0]==r2[6] & t2[6]!=`ALU1 & ~issue[iptr[6]] |
+                        r[0]==r1[7] & t1[7]!=`ALU1 & ~issue[iptr[7]] |
+                        r[0]==r2[7] & t2[7]!=`ALU1 & ~issue[iptr[7]])| r[0] == 0;
+    assign wb_ok[1] = ~(r[1]==r1[0] & t1[0]!=`ALU2 & ~issue[iptr[0]] |
+                        r[1]==r2[0] & t2[0]!=`ALU2 & ~issue[iptr[0]] |
+                        r[1]==r1[2] & t1[2]!=`ALU2 & ~issue[iptr[2]] |
+                        r[1]==r2[2] & t2[2]!=`ALU2 & ~issue[iptr[2]] |
+                        r[1]==r1[3] & t1[3]!=`ALU2 & ~issue[iptr[3]] |
+                        r[1]==r2[3] & t2[3]!=`ALU2 & ~issue[iptr[3]] |
+                        r[1]==r1[4] & t1[4]!=`ALU2 & ~issue[iptr[4]] |
+                        r[1]==r2[4] & t2[4]!=`ALU2 & ~issue[iptr[4]] |
+                        r[1]==r1[5] & t1[5]!=`ALU2 & ~issue[iptr[5]] |
+                        r[1]==r2[5] & t2[5]!=`ALU2 & ~issue[iptr[5]] |
+                        r[1]==r1[6] & t1[6]!=`ALU2 & ~issue[iptr[6]] |
+                        r[1]==r2[6] & t2[6]!=`ALU2 & ~issue[iptr[6]] |
+                        r[1]==r1[7] & t1[7]!=`ALU2 & ~issue[iptr[7]] |
+                        r[1]==r2[7] & t2[7]!=`ALU2 & ~issue[iptr[7]] ) | r[1] == 0;
+    assign wb_ok[2] = ~(r[2]==r1[0] & t1[0]!=`BRU & ~issue[iptr[0]] |
+                        r[2]==r2[0] & t2[0]!=`BRU & ~issue[iptr[0]] |
+                        r[2]==r1[1] & t1[1]!=`BRU & ~issue[iptr[1]] |
+                        r[2]==r2[1] & t2[1]!=`BRU & ~issue[iptr[1]] |
+                        r[2]==r1[3] & t1[3]!=`BRU & ~issue[iptr[3]] |
+                        r[2]==r2[3] & t2[3]!=`BRU & ~issue[iptr[3]] |
+                        r[2]==r1[4] & t1[4]!=`BRU & ~issue[iptr[4]] |
+                        r[2]==r2[4] & t2[4]!=`BRU & ~issue[iptr[4]] |
+                        r[2]==r1[5] & t1[5]!=`BRU & ~issue[iptr[5]] |
+                        r[2]==r2[5] & t2[5]!=`BRU & ~issue[iptr[5]] |
+                        r[2]==r1[6] & t1[6]!=`BRU & ~issue[iptr[6]] |
+                        r[2]==r2[6] & t2[6]!=`BRU & ~issue[iptr[6]] |
+                        r[2]==r1[7] & t1[7]!=`BRU & ~issue[iptr[7]] |
+                        r[2]==r2[7] & t2[7]!=`BRU & ~issue[iptr[7]] ) | r[2] == 0;
+    assign wb_ok[3] = ~(r[3]==r1[0] & t1[0]!=`AGU & ~issue[iptr[0]] |
+                        r[3]==r2[0] & t2[0]!=`AGU & ~issue[iptr[0]] |
+                        r[3]==r1[1] & t1[1]!=`AGU & ~issue[iptr[1]] |
+                        r[3]==r2[1] & t2[1]!=`AGU & ~issue[iptr[1]] |
+                        r[3]==r1[2] & t1[2]!=`AGU & ~issue[iptr[2]] |
+                        r[3]==r2[2] & t2[2]!=`AGU & ~issue[iptr[2]] |
+                        r[3]==r1[4] & t1[4]!=`AGU & ~issue[iptr[4]] |
+                        r[3]==r2[4] & t2[4]!=`AGU & ~issue[iptr[4]] |
+                        r[3]==r1[5] & t1[5]!=`AGU & ~issue[iptr[5]] |
+                        r[3]==r2[5] & t2[5]!=`AGU & ~issue[iptr[5]] |
+                        r[3]==r1[6] & t1[6]!=`AGU & ~issue[iptr[6]] |
+                        r[3]==r2[6] & t2[6]!=`AGU & ~issue[iptr[6]] |
+                        r[3]==r1[7] & t1[7]!=`AGU & ~issue[iptr[7]] |
+                        r[3]==r2[7] & t2[7]!=`AGU & ~issue[iptr[7]] ) | r[3] == 0;
+    assign wb_ok[4] = ~(r[4]==r1[0] & t1[0]!=`HILO & ~issue[iptr[0]] |
+                        r[4]==r2[0] & t2[0]!=`HILO & ~issue[iptr[0]] |
+                        r[4]==r1[1] & t1[1]!=`HILO & ~issue[iptr[1]] |
+                        r[4]==r2[1] & t2[1]!=`HILO & ~issue[iptr[1]] |
+                        r[4]==r1[2] & t1[2]!=`HILO & ~issue[iptr[2]] |
+                        r[4]==r2[2] & t2[2]!=`HILO & ~issue[iptr[2]] |
+                        r[4]==r1[3] & t1[3]!=`HILO & ~issue[iptr[3]] |
+                        r[4]==r2[3] & t2[3]!=`HILO & ~issue[iptr[3]] |
+                        r[4]==r1[5] & t1[5]!=`HILO & ~issue[iptr[5]] |
+                        r[4]==r2[5] & t2[5]!=`HILO & ~issue[iptr[5]] |
+                        r[4]==r1[6] & t1[6]!=`HILO & ~issue[iptr[6]] |
+                        r[4]==r2[6] & t2[6]!=`HILO & ~issue[iptr[6]] |
+                        r[4]==r1[7] & t1[7]!=`HILO & ~issue[iptr[7]] |
+                        r[4]==r2[7] & t2[7]!=`HILO & ~issue[iptr[7]] ) | r[4] == 0;
+    assign wb_ok[5] = ~(r[5]==r1[0] & t1[0]!=`ALU3 & ~issue[iptr[0]] |
+                        r[5]==r2[0] & t2[0]!=`ALU3 & ~issue[iptr[0]] |
+                        r[5]==r1[1] & t1[1]!=`ALU3 & ~issue[iptr[1]] |
+                        r[5]==r2[1] & t2[1]!=`ALU3 & ~issue[iptr[1]] |
+                        r[5]==r1[2] & t1[2]!=`ALU3 & ~issue[iptr[2]] |
+                        r[5]==r2[2] & t2[2]!=`ALU3 & ~issue[iptr[2]] |
+                        r[5]==r1[3] & t1[3]!=`ALU3 & ~issue[iptr[3]] |
+                        r[5]==r2[3] & t2[3]!=`ALU3 & ~issue[iptr[3]] |
+                        r[5]==r1[4] & t1[4]!=`ALU3 & ~issue[iptr[4]] |
+                        r[5]==r2[4] & t2[4]!=`ALU3 & ~issue[iptr[4]] |
+                        r[5]==r1[6] & t1[6]!=`ALU3 & ~issue[iptr[6]] |
+                        r[5]==r2[6] & t2[6]!=`ALU3 & ~issue[iptr[6]] |
+                        r[5]==r1[7] & t1[7]!=`ALU3 & ~issue[iptr[7]] |
+                        r[5]==r2[7] & t2[7]!=`ALU3 & ~issue[iptr[7]] ) | r[5] == 0;
+    assign wb_ok[6] = ~(r[6]==r1[0] & t1[0]!=`ALU4 & ~issue[iptr[0]] |
+                        r[6]==r2[0] & t2[0]!=`ALU4 & ~issue[iptr[0]] |
+                        r[6]==r1[1] & t1[1]!=`ALU4 & ~issue[iptr[1]] |
+                        r[6]==r2[1] & t2[1]!=`ALU4 & ~issue[iptr[1]] |
+                        r[6]==r1[2] & t1[2]!=`ALU4 & ~issue[iptr[2]] |
+                        r[6]==r2[2] & t2[2]!=`ALU4 & ~issue[iptr[2]] |
+                        r[6]==r1[3] & t1[3]!=`ALU4 & ~issue[iptr[3]] |
+                        r[6]==r2[3] & t2[3]!=`ALU4 & ~issue[iptr[3]] |
+                        r[6]==r1[4] & t1[4]!=`ALU4 & ~issue[iptr[4]] |
+                        r[6]==r2[4] & t2[4]!=`ALU4 & ~issue[iptr[4]] |
+                        r[6]==r1[5] & t1[5]!=`ALU4 & ~issue[iptr[5]] |
+                        r[6]==r2[5] & t2[5]!=`ALU4 & ~issue[iptr[5]] |
+                        r[6]==r1[7] & t1[7]!=`ALU4 & ~issue[iptr[7]] |
+                        r[6]==r2[7] & t2[7]!=`ALU4 & ~issue[iptr[7]] ) | r[6] == 0;
     assign wb_ok[7] = 0;
 endmodule
