@@ -6,8 +6,8 @@ module scoreboard(
     // input wire dcache_miss,
     output wire stallreq,
 
-    input wire inst1_valid,
-    input wire [`ID_TO_SB_WD-1:0] inst1,
+    input wire inst1_valid, inst2_valid,
+    input wire [`ID_TO_SB_WD-1:0] inst1, inst2,
 
     output wire [`BR_WD-1:0] br_bus,
 
@@ -73,7 +73,7 @@ module scoreboard(
     wire full_next;
     wire [4:0] rest;
     assign rest = wptr_next[4] == rptr_next[4] ? (wptr_next - rptr_next) : ({1'b1,wptr_next[3:0]} - {1'b0,rptr_next[3:0]});
-    assign full_next = rest > 14 ? 1 : 0;
+    assign full_next = rest > 12 ? 1 : 0;
     assign stallreq = full;
     // assign flush = br_e;
     
@@ -96,7 +96,10 @@ module scoreboard(
             wptr <= rptr + 2;
         end
         else if (!full & !br_bus[32] & inst1_valid) begin
-            wptr <= wptr_next;
+            wptr <= wptr + 2;
+        end
+        else if (!full & !br_bus[32] & inst2_valid) begin
+            wptr <= wptr + 1;
         end
     end
 
@@ -177,6 +180,20 @@ module scoreboard(
                 execute[waddr] <= 1'b0;
                 writeback[waddr] <= 1'b0;
                 inst_status[waddr] <= {wptr, inst1};
+                valid_inst[waddr+1'b1] <= 1'b1;
+                dispatch[waddr+1'b1] <= 1'b0;
+                issue[waddr+1'b1] <= 1'b0;
+                execute[waddr+1'b1] <= 1'b0;
+                writeback[waddr+1'b1] <= 1'b0;
+                inst_status[waddr+1'b1] <= {wptr+1'b1, inst2};
+            end
+            else if (!full & !br_bus[32] & inst2_valid) begin
+                valid_inst[waddr] <= 1'b1;
+                dispatch[waddr] <= 1'b0;
+                issue[waddr] <= 1'b0;
+                execute[waddr] <= 1'b0;
+                writeback[waddr] <= 1'b0;
+                inst_status[waddr] <= {wptr, inst2};
             end
             else if (br_bus[32]) begin
                 // valid_inst <= 16'b0 ;

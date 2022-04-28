@@ -8,7 +8,7 @@ module mycpu_core(
     output wire [3:0] inst_sram_wen,
     output wire [31:0] inst_sram_addr,
     output wire [31:0] inst_sram_wdata,
-    input wire [31:0] inst_sram_rdata,
+    input wire [63:0] inst_sram_rdata,
 
     output wire data_sram_en,
     output wire [3:0] data_sram_wen,
@@ -24,8 +24,8 @@ module mycpu_core(
     wire stall;
     wire [31:0] pc;
     wire [`BR_WD-1:0] br_bus;
-    wire inst1_valid;
-    wire [`ID_TO_SB_WD-1:0] inst1_bus;
+    wire inst1_valid, inst2_valid;
+    wire [`ID_TO_SB_WD-1:0] inst1_bus, inst2_bus;
     wire stallreq;
     assign stall = stallreq;
 
@@ -42,23 +42,39 @@ module mycpu_core(
         .inst_sram_wdata (inst_sram_wdata )
     );
     
-    decoder u_decoder(
+    // decoder u_decoder(
+    // 	.clk             (clk             ),
+    //     .resetn          (resetn          ),
+    //     .br_bus          (br_bus          ),
+    //     .stall           (stall           ),
+    //     .pc              (pc              ),
+    //     .inst_sram_rdata (inst_sram_rdata ),
+    //     .inst_valid      (inst1_valid     ),
+    //     .id_to_sb_bus    (inst1_bus       )
+    // );
+    
+    ID u_ID(
     	.clk             (clk             ),
         .resetn          (resetn          ),
         .br_bus          (br_bus          ),
         .stall           (stall           ),
         .pc              (pc              ),
         .inst_sram_rdata (inst_sram_rdata ),
-        .inst_valid      (inst1_valid     ),
-        .id_to_sb_bus    (inst1_bus       )
+        .inst1_valid     (inst1_valid     ),
+        .inst1           (inst1_bus       ),
+        .inst2_valid     (inst2_valid     ),
+        .inst2           (inst2_bus       )
     );
     
+
     scoreboard u_scoreboard(
     	.clk               (clk               ),
         .resetn            (resetn            ),
         .stallreq          (stallreq          ),
         .inst1_valid       (inst1_valid       ),
+        .inst2_valid       (inst2_valid       ),
         .inst1             (inst1_bus         ),
+        .inst2             (inst2_bus         ),
         .br_bus            (br_bus            ),
         .data_sram_en      (data_sram_en      ),
         .data_sram_wen     (data_sram_wen     ),

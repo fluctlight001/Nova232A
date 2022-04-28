@@ -33,12 +33,12 @@ module IF (
 
     always @ (posedge clk) begin
         if (!resetn) begin
-            pc_reg <= 32'hbfbf_fffc;
+            pc_reg <= 32'hbfbf_fff8;
             r_br_e <= 1'b0;
             r_br_addr <= 32'b0;
         end
         else if (!stall) begin
-            pc_reg <= r_br_e ? r_br_addr : br_e ? br_addr : next_pc;
+            pc_reg <= r_br_e ? {r_br_addr[31:3],3'b0} : br_e ? {br_addr[31:3],3'b0} : {next_pc[31:3],3'b0};
             r_br_e <= 1'b0;
         end
         else if (br_e) begin
@@ -56,7 +56,7 @@ module IF (
         end
     end
 
-    assign next_pc = pc_reg + 32'd4;
+    assign next_pc = pc_reg + 32'd8;
 
     assign ce_next = ~resetn ? 1'b0 : 1'b1;
 

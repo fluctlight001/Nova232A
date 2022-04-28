@@ -1,99 +1,17 @@
 `include "lib/defines.vh"
-module decoder (
+module decoder
+#(parameter  sel_arr = 4'b1000) 
+(
     input wire clk,
     input wire resetn,
-
-    input wire [`BR_WD-1:0] br_bus,
     input wire stall,
     
     input wire [31:0] pc,
-    input wire [31:0] inst_sram_rdata,
+    input wire [31:0] inst,
     
     output wire inst_valid,
-    output wire [`ID_TO_SB_WD-1:0] id_to_sb_bus
+    output wire [`ID_TO_SB_WD-1:0] inst_info
 );
-    reg [31:0] easy_pc;
-    reg [31:0] sram_pc, pc_r, inst_sram_rdata_r;
-    wire br_e;
-    wire [31:0] br_addr;
-    assign {br_e, br_addr} = br_bus;
-
-    wire cmp;
-    reg cmp_valid;
-    reg [31:0] r_br_addr;
-
-    wire easy_match;
-    assign easy_match = easy_pc == pc_r ? 1'b1 : 1'b0;
-
-    always @ (posedge clk) begin
-        if (!resetn) begin
-            easy_pc <= 32'hbfc0_0000;
-        end
-        // else if (stall) begin
-            
-        // end
-        else if (br_e) begin
-            easy_pc <= br_bus;
-        end
-        else if (inst_valid) begin
-            easy_pc <= easy_pc + 32'd4;
-        end
-    end
-
-    always @ (posedge clk) begin
-        if (!resetn | br_e) begin
-            sram_pc <= 32'b0;
-        end
-        else if (!stall) begin
-            sram_pc <= pc;
-        end
-    end
-
-    always @ (posedge clk) begin
-        if (!resetn) begin
-            cmp_valid <= 1'b0;
-            r_br_addr <= 32'hbfc00000;
-        end
-        else if (br_e) begin
-            cmp_valid <= 1'b0;
-            r_br_addr <= br_addr;
-        end
-        else if (cmp) begin
-            cmp_valid <= 1'b1;
-            r_br_addr <= 32'b0;
-        end
-    end
-
-    assign cmp = cmp_valid | (sram_pc == r_br_addr) ? 1'b1 : 1'b0;
-
-    reg flag;
-    reg [31:0] buf_pc, buf_inst;
-
-    always @ (posedge clk) begin
-        if (stall & !flag) begin
-            buf_pc <= sram_pc;
-            buf_inst <= inst_sram_rdata;
-        end
-    end
-
-    always @ (posedge clk) begin
-        if (!resetn | !cmp ) begin
-            pc_r <= 32'b0;
-            inst_sram_rdata_r <= 32'b0;
-            flag <= 1'b0;
-        end
-        else if (!stall) begin
-            pc_r <= flag ? buf_pc : sram_pc;
-            inst_sram_rdata_r <= flag ? buf_inst : inst_sram_rdata;
-            flag <= 1'b0;
-        end
-        else if (!flag) begin
-            flag <= 1'b1;
-        end
-    end
-
-    wire [31:0] inst;
-    assign inst = inst_sram_rdata_r;
 
     wire [5:0] opcode;
     wire [4:0] rs,rt,rd,sa;
@@ -314,14 +232,14 @@ module decoder (
                  | {32{sel_alu_imm[1]}} & {{16{inst[15]}}, inst[15:0]}      // imm_sign_extend
                  | {32{sel_alu_imm[2]}} & {16'b0, inst[15:0]}               // imm_zero_extend
                  | {32{sel_alu_imm[3]}} & {{14{inst[15]}},inst[15:0],2'b0}  // offset_sign_extend
-                 | {32{sel_alu_imm[4]}} & {pc_r[31:28],instr_index,2'b0};   // instr_index_extend
+                 | {32{sel_alu_imm[4]}} & {pc[31:28],instr_index,2'b0};     // instr_index_extend
 
     
     wire alu_inst = |alu_op;
     reg [3:0] alu_sel;
     always @ (posedge clk) begin
         if (!resetn) begin
-            alu_sel <= 4'b1000;
+            alu_sel <= sel_arr;
         end
         else if (alu_inst & !stall) begin
             alu_sel <= {alu_sel[2:0], alu_sel[3]};
@@ -379,7 +297,7 @@ module decoder (
     // 0 -> reg2 | 1 -> imm
     assign sel_src2 = sel_alu_imm[1] | sel_alu_imm[2]; 
 
-    assign id_to_sb_bus = {
+    assign inst_info = {
         except_sw,  // 136
         excepttype, // 135:104
         op,         // 103:92
@@ -395,10 +313,10 @@ module decoder (
         imm_o,      // 65:34
         sel_src1,   // 33
         sel_src2,   // 32
-        pc_r        // 31:0
+        pc        // 31:0
     };
 
-    assign inst_valid = (|pc_r) & (~stall) & easy_match &
+    assign inst_valid = (|pc) & (~stall) &
                         (inst_add | inst_addi | inst_addu | inst_addiu
                         | inst_sub | inst_subu | inst_slt | inst_slti 
                         | inst_sltu | inst_sltiu | inst_div | inst_divu
