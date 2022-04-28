@@ -257,7 +257,8 @@ module decoder (
     };
 
     assign mem_op = {
-        4'b0,
+        2'b0,
+        inst_mfc0, inst_mtc0,
         inst_lb, inst_lbu, inst_lh, inst_lhu, 
         inst_lw, inst_sb, inst_sh, inst_sw
     };
@@ -274,7 +275,7 @@ module decoder (
                     | inst_sub | inst_and | inst_andi | inst_nor | inst_xori | inst_sllv | inst_sra | inst_srav
                     | inst_srl | inst_srlv | inst_bltzal | inst_bgezal | inst_jalr | inst_mflo | inst_mfhi
                     | inst_lh | inst_lhu | inst_lb | inst_lbu 
-                    | inst_div | inst_divu | inst_mult | inst_multu | inst_mthi | inst_mtlo;
+                    | inst_div | inst_divu | inst_mult | inst_multu | inst_mthi | inst_mtlo | inst_mfc0;
 
     // store in [rd]
     assign sel_rf_dst[0]    = inst_addu | inst_subu | inst_sll | inst_or | inst_xor | inst_sltu | inst_slt | inst_add
@@ -282,7 +283,7 @@ module decoder (
                             | inst_mflo | inst_mfhi;
     // store in [rt] 
     assign sel_rf_dst[1]    = inst_ori | inst_lui | inst_addiu | inst_lw | inst_slti | inst_sltiu | inst_addi | inst_andi
-                            | inst_xori | inst_lh | inst_lhu | inst_lb | inst_lbu;
+                            | inst_xori | inst_lh | inst_lhu | inst_lb | inst_lbu | inst_mfc0;
     // store in [31]
     assign sel_rf_dst[2] = inst_jal | inst_bltzal | inst_bgezal | inst_jalr;
     // store in [hilo]
@@ -352,11 +353,11 @@ module decoder (
     assign fu_sel[0] = alu_sel[0] & alu_inst;
     assign fu_sel[1] = alu_sel[1] & alu_inst;
     assign fu_sel[2] = inst_beq | inst_bne | inst_bgez | inst_bgtz | inst_blez | inst_bltz | inst_bltzal | inst_bgezal | inst_j | inst_jal | inst_jr | inst_jalr;
-    assign fu_sel[3] = inst_lb | inst_lbu | inst_lh | inst_lhu | inst_lw | inst_sb | inst_sh | inst_sw;
+    assign fu_sel[3] = inst_lb | inst_lbu | inst_lh | inst_lhu | inst_lw | inst_sb | inst_sh | inst_sw | inst_mfc0 | inst_mtc0;
     assign fu_sel[4] = inst_mfhi | inst_mflo | inst_mthi | inst_mtlo | inst_mult | inst_multu | inst_div | inst_divu;
     assign fu_sel[5] = alu_sel[2] & alu_inst;
     assign fu_sel[6] = alu_sel[3] & alu_inst;
-    assign reg1 = {1'b0, rs};
+    assign reg1 = (inst_mfc0 | inst_mtc0) ? {1'b0, rd} : {1'b0, rs};
     assign reg2 = (inst_mflo | inst_mfhi) ? 6'd32 : {1'b0, rt};
     assign reg3 = rf_waddr;
     assign r1_val = inst_add | inst_addiu | inst_addu | inst_subu | inst_ori | inst_or | inst_sw | inst_lw 
@@ -364,11 +365,11 @@ module decoder (
                     | inst_and | inst_andi | inst_nor | inst_xori | inst_sllv | inst_srav | inst_srlv
                     | inst_lb | inst_lbu | inst_lh | inst_lhu | inst_sb | inst_sh | inst_jr | inst_jalr
                     | inst_beq | inst_bne |inst_bgez | inst_bgtz | inst_blez | inst_bltz | inst_bgezal | inst_bltzal
-                    | inst_mthi | inst_mtlo | inst_mult | inst_multu | inst_div | inst_divu;
+                    | inst_mthi | inst_mtlo | inst_mult | inst_multu | inst_div | inst_divu | inst_mfc0;
     assign r2_val = inst_add | inst_addu | inst_subu | inst_sll | inst_or | inst_xor | inst_sltu | inst_slt
                     | inst_sub | inst_and | inst_nor | inst_sllv | inst_sra | inst_srav | inst_srl | inst_srlv
                     | inst_beq | inst_bne | inst_sb | inst_sh | inst_sw | inst_mult | inst_multu | inst_div | inst_divu
-                    | inst_mflo | inst_mfhi;
+                    | inst_mflo | inst_mfhi | inst_mtc0;
     // reg1 useless or reg1 use imm
     assign r1_rdy = ~r1_val;
     // reg2 useless or reg2 use imm
@@ -412,7 +413,7 @@ module decoder (
                         | inst_lb | inst_lbu | inst_lh | inst_lhu 
                         | inst_lw | inst_sb | inst_sh | inst_sw 
                         // | inst_break | inst_syscall | inst_eret 
-                        // | inst_mfc0 | inst_mtc0
+                        | inst_mfc0 | inst_mtc0
                         );
     
 
