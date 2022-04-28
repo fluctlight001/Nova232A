@@ -242,7 +242,7 @@ module decoder
             alu_sel <= sel_arr;
         end
         else if (alu_inst & !stall) begin
-            alu_sel <= {alu_sel[2:0], alu_sel[3]};
+            alu_sel <= {alu_sel[2],alu_sel[3],alu_sel[0],alu_sel[1]};
         end
     end
 //  output
