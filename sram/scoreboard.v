@@ -50,7 +50,8 @@ module scoreboard(
     wire [3:0] store_sel;
     wire [31:0] wdata [7:0];
     wire [31:0] extra_wdata [7:0];
-    wire dispatch_ok;
+    wire dispatch1_ok;
+    wire dispatch2_ok;
     wire [7:0] wb_ok;
     
     wire agu_sram_en;
@@ -87,7 +88,7 @@ module scoreboard(
         end
     end
 
-    assign wptr_next = wptr + 1;
+    assign wptr_next = inst1_valid ? wptr + 2 : wptr + 1;
     always @ (posedge clk) begin
         if (!resetn) begin
             wptr <= 0;
@@ -103,21 +104,22 @@ module scoreboard(
         end
     end
 
-
+    //  retire // commit
     wire [3:0] raddr;
+    wire b_s; // 跳转指令后面跟着store指令
     always @ (posedge clk) begin
         if (!resetn) begin
             rptr <= 0;
         end
-        else if (~(dcache_miss&st_e_r[raddr])) begin
+        else if (~(dcache_miss&(st_e_r[raddr]|b_s))) begin
             rptr <= rptr_next;
         end
     end
-    //  retire // commit
     
+    assign b_s = br_e_r[raddr] & valid_inst[raddr] & writeback[raddr] & st_e_r[raddr+1'b1] & valid_inst[raddr+1'b1] & writeback[raddr+1'b1];
     assign raddr = rptr[3:0];
     assign retire_en[0] = valid_inst[raddr] & writeback[raddr] & (~br_e_r[raddr] | (valid_inst[raddr+1'b1]&writeback[raddr+1'b1]));
-    assign retire_en[1] = 1'b0; // inst_status[rptr+1][`CPLT] & retire_en[0];
+    assign retire_en[1] = retire_en[0] & valid_inst[raddr+1'b1] & writeback[raddr+1'b1] & ~br_e_r[raddr+1'b1] & (~st_e_r[raddr+1'b1]|b_s);
     assign retire_en[2] = 1'b0; // inst_status[rptr+2][`CPLT] & retire_en[1];
     assign retire_en[3] = 1'b0; // inst_status[rptr+3][`CPLT] & retire_en[2];
     
@@ -131,18 +133,33 @@ module scoreboard(
         endcase
     end
 
-    assign dispatch_ok = valid_inst[dptr]&~dispatch[dptr]&~busy[inst_status[dptr][`FU]]&reg_status[inst_status[dptr][`REG3]]==`NULL&(!br_bus[32]|dptr==raddr+1'b1);
+    assign dispatch1_ok = valid_inst[dptr] 
+                        & ~dispatch[dptr]
+                        & ~busy[inst_status[dptr][`FU]]
+                        & reg_status[inst_status[dptr][`REG3]]==`NULL
+                        & !br_bus[32];// | dptr == raddr+1'b1);
+    assign dispatch2_ok = valid_inst[dptr+1'b1] 
+                        & ~dispatch[dptr+1'b1] 
+                        & ~busy[inst_status[dptr+1'b1][`FU]] 
+                        & inst_status[dptr][`FU]!=inst_status[dptr+1'b1][`FU] 
+                        & reg_status[inst_status[dptr+1'b1][`REG3]]==`NULL & (inst_status[dptr+1'b1][`REG3]!=inst_status[dptr][`REG3] | inst_status[dptr+1'b1][`REG3]==0) 
+                        & !br_bus[32] 
+                        & dispatch1_ok;
+                        
     always @ (posedge clk) begin
         if (!resetn) begin
             dptr <= 0;
         end
         else if (br_bus[32]) begin
-            dptr <= rptr[3:0] + 1'd1;
+            dptr <= rptr[3:0] + 2'd2;
         end
         else if (dispatch[dptr]) begin
             dptr <= dptr + 1'b1;
         end
-        else if (dispatch_ok) begin
+        else if (dispatch2_ok) begin
+            dptr <= dptr + 2'd2;
+        end
+        else if (dispatch1_ok) begin
             dptr <= dptr + 1'b1;
         end
     end
@@ -172,6 +189,42 @@ module scoreboard(
             execute <= 16'b0;
             writeback <= 16'b0;
         end
+        else if (br_bus[32]) begin
+            // valid_inst <= 16'b0 ;
+            // valid_inst[raddr+1'b1] <= 1'b1;
+            // dispatch[raddr+2'd2] <= 1'b0;
+            // issue[raddr+2'd2] <= 1'b0;
+            // execute[raddr+2'd2] <= 1'b0;
+            // writeback[raddr+2'd2] <= 1'b0;
+            // inst_status[raddr+2'd2] <= `INST_STATE_WD'b0;
+            inst_status[ 0] <= `INST_STATE_WD'b0;
+            inst_status[ 1] <= `INST_STATE_WD'b0;
+            inst_status[ 2] <= `INST_STATE_WD'b0;
+            inst_status[ 3] <= `INST_STATE_WD'b0;
+            inst_status[ 4] <= `INST_STATE_WD'b0;
+            inst_status[ 5] <= `INST_STATE_WD'b0;
+            inst_status[ 6] <= `INST_STATE_WD'b0;
+            inst_status[ 7] <= `INST_STATE_WD'b0;
+            inst_status[ 8] <= `INST_STATE_WD'b0;
+            inst_status[ 9] <= `INST_STATE_WD'b0;
+            inst_status[10] <= `INST_STATE_WD'b0;
+            inst_status[11] <= `INST_STATE_WD'b0;
+            inst_status[12] <= `INST_STATE_WD'b0;
+            inst_status[13] <= `INST_STATE_WD'b0;
+            inst_status[14] <= `INST_STATE_WD'b0;
+            inst_status[15] <= `INST_STATE_WD'b0;
+            valid_inst <= 16'b0;
+            dispatch <= 16'b0;
+            issue <= 16'b0;
+            execute <= 16'b0;
+            writeback <= 16'b0;
+            // inst_status[raddr+1'b1] <= inst_status[raddr+1'b1];
+            // valid_inst[raddr+1'b1] <= valid_inst[raddr+1'b1];
+            // dispatch[raddr+1'b1] <= dispatch[raddr+1'b1];
+            // issue[raddr+1'b1] <= issue[raddr+1'b1];
+            // execute[raddr+1'b1] <= execute[raddr+1'b1];
+            // writeback[raddr+1'b1] <= writeback[raddr+1'b1];
+        end
         else begin
             if (!full & !br_bus[32] & inst1_valid) begin
                 valid_inst[waddr] <= 1'b1;
@@ -195,43 +248,11 @@ module scoreboard(
                 writeback[waddr] <= 1'b0;
                 inst_status[waddr] <= {wptr, inst2};
             end
-            else if (br_bus[32]) begin
-                // valid_inst <= 16'b0 ;
-                // valid_inst[raddr+1'b1] <= 1'b1;
-                // dispatch[raddr+2'd2] <= 1'b0;
-                // issue[raddr+2'd2] <= 1'b0;
-                // execute[raddr+2'd2] <= 1'b0;
-                // writeback[raddr+2'd2] <= 1'b0;
-                // inst_status[raddr+2'd2] <= `INST_STATE_WD'b0;
-                inst_status[ 0] <= `INST_STATE_WD'b0;
-                inst_status[ 1] <= `INST_STATE_WD'b0;
-                inst_status[ 2] <= `INST_STATE_WD'b0;
-                inst_status[ 3] <= `INST_STATE_WD'b0;
-                inst_status[ 4] <= `INST_STATE_WD'b0;
-                inst_status[ 5] <= `INST_STATE_WD'b0;
-                inst_status[ 6] <= `INST_STATE_WD'b0;
-                inst_status[ 7] <= `INST_STATE_WD'b0;
-                inst_status[ 8] <= `INST_STATE_WD'b0;
-                inst_status[ 9] <= `INST_STATE_WD'b0;
-                inst_status[10] <= `INST_STATE_WD'b0;
-                inst_status[11] <= `INST_STATE_WD'b0;
-                inst_status[12] <= `INST_STATE_WD'b0;
-                inst_status[13] <= `INST_STATE_WD'b0;
-                inst_status[14] <= `INST_STATE_WD'b0;
-                inst_status[15] <= `INST_STATE_WD'b0;
-                valid_inst <= 16'b0;
-                dispatch <= 16'b0;
-                issue <= 16'b0;
-                execute <= 16'b0;
-                writeback <= 16'b0;
-                inst_status[raddr+1'b1] <= inst_status[raddr+1'b1];
-                valid_inst[raddr+1'b1] <= valid_inst[raddr+1'b1];
-                dispatch[raddr+1'b1] <= dispatch[raddr+1'b1];
-                issue[raddr+1'b1] <= issue[raddr+1'b1];
-                execute[raddr+1'b1] <= execute[raddr+1'b1];
-                writeback[raddr+1'b1] <= writeback[raddr+1'b1];
+            if (dispatch2_ok) begin
+                dispatch[dptr] <= 1'b1;
+                dispatch[dptr+1'b1] <= 1'b1;
             end
-            if (dispatch_ok) begin
+            else if (dispatch1_ok) begin
                 dispatch[dptr] <= 1'b1;
             end
             // if (valid_inst[iptr[0]] & fu_rdy[0]) issue[iptr[0]] <= 1'b1;
@@ -264,20 +285,30 @@ module scoreboard(
             if (valid_inst[iptr[6]] & wb_ok[6] & execute[iptr[6]]) writeback[iptr[6]] <= 1'b1;
             if (valid_inst[iptr[7]] & wb_ok[7] & execute[iptr[7]]) writeback[iptr[7]] <= 1'b1;
 
-            if (retire_en[0] & ~(dcache_miss&st_e_r[raddr])) begin
+            if (retire_en[0] & ~(dcache_miss&(st_e_r[raddr]|b_s))) begin
                 valid_inst[raddr] <= 1'b0;
                 dispatch[raddr] <= 1'b0;
                 issue[raddr] <= 1'b0;
                 execute[raddr] <= 1'b0;
                 writeback[raddr] <= 1'b0;
                 inst_status[raddr] <= `INST_STATE_WD'b0;
+                if (retire_en[1]) begin
+                    valid_inst[raddr+1'b1] <= 1'b0;
+                    dispatch[raddr+1'b1] <= 1'b0;
+                    issue[raddr+1'b1] <= 1'b0;
+                    execute[raddr+1'b1] <= 1'b0;
+                    writeback[raddr+1'b1] <= 1'b0;
+                    inst_status[raddr+1'b1] <= `INST_STATE_WD'b0;
+                end
             end 
         end
     end
 
     wire [2:0] fu_ptr;
+    wire [2:0] fu_ptr2;
     wire [2:0] ds_ptr;
     assign fu_ptr = inst_status[dptr][`FU];
+    assign fu_ptr2 = inst_status[dptr+1'b1][`FU];
     assign ds_ptr = inst_status[raddr+1'd1][`FU];
     always @ (posedge clk) begin
         if (!resetn) begin
@@ -315,164 +346,189 @@ module scoreboard(
             iptr[5] <= 0;
             iptr[6] <= 0;
             iptr[7] <= 0;
-            {busy[ds_ptr],op[ds_ptr],r[ds_ptr],r1[ds_ptr],r2[ds_ptr],t1[ds_ptr],t2[ds_ptr]} <= {busy[ds_ptr],op[ds_ptr],r[ds_ptr],r1[ds_ptr],r2[ds_ptr],t1[ds_ptr],t2[ds_ptr]};
-            iptr[ds_ptr] <= iptr[ds_ptr];
-            if (fu_ptr == ds_ptr) begin
-                if (dispatch_ok) begin
-                    iptr[fu_ptr] <= inst_status[dptr][`ADDR];
-                    busy[fu_ptr] <= 1'b1;
-                    op[fu_ptr] <= inst_status[dptr][`OP];
-                    r[fu_ptr] <= inst_status[dptr][`REG3];
-                    r1[fu_ptr] <= inst_status[dptr][`R1VAL] ? inst_status[dptr][`REG1] : 6'b111111;
-                    r2[fu_ptr] <= inst_status[dptr][`R2VAL] ? inst_status[dptr][`REG2] : 6'b111111;
-                    t1[fu_ptr] <= inst_status[dptr][`R1VAL] ? (valid_inst[raddr] & writeback[raddr] & inst_status[dptr][`REG1]==inst_status[raddr][`REG3] ? `NULL : reg_status[inst_status[dptr][`REG1]]) : `NULL;
-                    t2[fu_ptr] <= inst_status[dptr][`R2VAL] ? (valid_inst[raddr] & writeback[raddr] & inst_status[dptr][`REG2]==inst_status[raddr][`REG3] ? `NULL : reg_status[inst_status[dptr][`REG2]]) : `NULL;
-                end
-            end
+            // {busy[ds_ptr],op[ds_ptr],r[ds_ptr],r1[ds_ptr],r2[ds_ptr],t1[ds_ptr],t2[ds_ptr]} <= {busy[ds_ptr],op[ds_ptr],r[ds_ptr],r1[ds_ptr],r2[ds_ptr],t1[ds_ptr],t2[ds_ptr]};
+            // iptr[ds_ptr] <= iptr[ds_ptr];
+            // if (fu_ptr == ds_ptr) begin
+            //     if (dispatch1_ok) begin
+            //         iptr[fu_ptr] <= inst_status[dptr][`ADDR];
+            //         busy[fu_ptr] <= 1'b1;
+            //         op[fu_ptr] <= inst_status[dptr][`OP];
+            //         r[fu_ptr] <= inst_status[dptr][`REG3];
+            //         r1[fu_ptr] <= inst_status[dptr][`R1VAL] ? inst_status[dptr][`REG1] : 6'b111111;
+            //         r2[fu_ptr] <= inst_status[dptr][`R2VAL] ? inst_status[dptr][`REG2] : 6'b111111;
+            //         t1[fu_ptr] <= inst_status[dptr][`R1VAL] ? (valid_inst[raddr] & writeback[raddr] & inst_status[dptr][`REG1]==inst_status[raddr][`REG3] ? `NULL : reg_status[inst_status[dptr][`REG1]]) : `NULL;
+            //         t2[fu_ptr] <= inst_status[dptr][`R2VAL] ? (valid_inst[raddr] & writeback[raddr] & inst_status[dptr][`REG2]==inst_status[raddr][`REG3] ? `NULL : reg_status[inst_status[dptr][`REG2]]) : `NULL;
+            //     end
+            // end
         end
         else begin
-            if (valid_inst[iptr[0]] & writeback[iptr[0]] & iptr[0]==raddr & retire_en[0] & busy[0]) begin
-                // t1[1] <= t1[1] == `ALU1 ? `NULL : t1[1];
-                t1[1] <= t1[1] == `ALU1 ? `NULL : t1[1];
-                t2[1] <= t2[1] == `ALU1 ? `NULL : t2[1];
-                t1[2] <= t1[2] == `ALU1 ? `NULL : t1[2];
-                t2[2] <= t2[2] == `ALU1 ? `NULL : t2[2];
-                t1[3] <= t1[3] == `ALU1 ? `NULL : t1[3];
-                t2[3] <= t2[3] == `ALU1 ? `NULL : t2[3];
-                t1[4] <= t1[4] == `ALU1 ? `NULL : t1[4];
-                t2[4] <= t2[4] == `ALU1 ? `NULL : t2[4];
-                t1[5] <= t1[5] == `ALU1 ? `NULL : t1[5];
-                t2[5] <= t2[5] == `ALU1 ? `NULL : t2[5];
-                t1[6] <= t1[6] == `ALU1 ? `NULL : t1[6];
-                t2[6] <= t2[6] == `ALU1 ? `NULL : t2[6];
-                t1[7] <= t1[7] == `ALU1 ? `NULL : t1[7];
-                t2[7] <= t2[7] == `ALU1 ? `NULL : t2[7];
+            if (valid_inst[iptr[0]] & writeback[iptr[0]] & (iptr[0]==raddr & retire_en[0] | iptr[0]==raddr+1'b1 & retire_en[1]) & busy[0]) begin
+                if (t1[1]==`ALU1) t1[1] <= `NULL;
+                if (t2[1]==`ALU1) t2[1] <= `NULL;
+                if (t1[2]==`ALU1) t1[2] <= `NULL;
+                if (t2[2]==`ALU1) t2[2] <= `NULL;
+                if (t1[3]==`ALU1) t1[3] <= `NULL;
+                if (t2[3]==`ALU1) t2[3] <= `NULL;
+                if (t1[4]==`ALU1) t1[4] <= `NULL;
+                if (t2[4]==`ALU1) t2[4] <= `NULL;
+                if (t1[5]==`ALU1) t1[5] <= `NULL;
+                if (t2[5]==`ALU1) t2[5] <= `NULL;
+                if (t1[6]==`ALU1) t1[6] <= `NULL;
+                if (t2[6]==`ALU1) t2[6] <= `NULL;
+                if (t1[7]==`ALU1) t1[7] <= `NULL;
+                if (t2[7]==`ALU1) t2[7] <= `NULL;
                 {busy[0],op[0],r[0],r1[0],r2[0],t1[0],t2[0]} <= {1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
                 iptr[0] <= 0;
             end
-            else if (valid_inst[iptr[1]] & writeback[iptr[1]] & iptr[1]==raddr & retire_en[0] & busy[1]) begin
-                // t1[1] <= t1[1] == `ALU1 ? `NULL : t1[1];
-                t1[0] <= t1[0] == `ALU2 ? `NULL : t1[0];
-                t2[0] <= t2[0] == `ALU2 ? `NULL : t2[0];
-                t1[2] <= t1[2] == `ALU2 ? `NULL : t1[2];
-                t2[2] <= t2[2] == `ALU2 ? `NULL : t2[2];
-                t1[3] <= t1[3] == `ALU2 ? `NULL : t1[3];
-                t2[3] <= t2[3] == `ALU2 ? `NULL : t2[3];
-                t1[4] <= t1[4] == `ALU2 ? `NULL : t1[4];
-                t2[4] <= t2[4] == `ALU2 ? `NULL : t2[4];
-                t1[5] <= t1[5] == `ALU2 ? `NULL : t1[5];
-                t2[5] <= t2[5] == `ALU2 ? `NULL : t2[5];
-                t1[6] <= t1[6] == `ALU2 ? `NULL : t1[6];
-                t2[6] <= t2[6] == `ALU2 ? `NULL : t2[6];
-                t1[7] <= t1[7] == `ALU2 ? `NULL : t1[7];
-                t2[7] <= t2[7] == `ALU2 ? `NULL : t2[7];
+            if (valid_inst[iptr[1]] & writeback[iptr[1]] & (iptr[1]==raddr & retire_en[0] | iptr[1]==raddr+1'b1 & retire_en[1]) & busy[1]) begin
+                if (t1[0]==`ALU2) t1[0] <= `NULL;
+                if (t2[0]==`ALU2) t2[0] <= `NULL;
+                if (t1[2]==`ALU2) t1[2] <= `NULL;
+                if (t2[2]==`ALU2) t2[2] <= `NULL;
+                if (t1[3]==`ALU2) t1[3] <= `NULL;
+                if (t2[3]==`ALU2) t2[3] <= `NULL;
+                if (t1[4]==`ALU2) t1[4] <= `NULL;
+                if (t2[4]==`ALU2) t2[4] <= `NULL;
+                if (t1[5]==`ALU2) t1[5] <= `NULL;
+                if (t2[5]==`ALU2) t2[5] <= `NULL;
+                if (t1[6]==`ALU2) t1[6] <= `NULL;
+                if (t2[6]==`ALU2) t2[6] <= `NULL;
+                if (t1[7]==`ALU2) t1[7] <= `NULL;
+                if (t2[7]==`ALU2) t2[7] <= `NULL;
                 {busy[1],op[1],r[1],r1[1],r2[1],t1[1],t2[1]} <= {1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
                 iptr[1] <= 0;
             end
-            else if (valid_inst[iptr[2]] & writeback[iptr[2]] & iptr[2]==raddr & retire_en[0] & busy[2]) begin
-                // t1[1] <= t1[1] == `ALU1 ? `NULL : t1[1];
-                t1[0] <= t1[0] == `BRU ? `NULL : t1[0];
-                t2[0] <= t2[0] == `BRU ? `NULL : t2[0];
-                t1[1] <= t1[1] == `BRU ? `NULL : t1[1];
-                t2[1] <= t2[1] == `BRU ? `NULL : t2[1];
-                t1[3] <= t1[3] == `BRU ? `NULL : t1[3];
-                t2[3] <= t2[3] == `BRU ? `NULL : t2[3];
-                t1[4] <= t1[4] == `BRU ? `NULL : t1[4];
-                t2[4] <= t2[4] == `BRU ? `NULL : t2[4];
-                t1[5] <= t1[5] == `BRU ? `NULL : t1[5];
-                t2[5] <= t2[5] == `BRU ? `NULL : t2[5];
-                t1[6] <= t1[6] == `BRU ? `NULL : t1[6];
-                t2[6] <= t2[6] == `BRU ? `NULL : t2[6];
-                t1[7] <= t1[7] == `BRU ? `NULL : t1[7];
-                t2[7] <= t2[7] == `BRU ? `NULL : t2[7];
+            if (valid_inst[iptr[2]] & writeback[iptr[2]] & (iptr[2]==raddr & retire_en[0] | iptr[2]==raddr+1'b1 & retire_en[1]) & busy[2]) begin
+                if (t1[0]==`BRU) t1[0] <= `NULL;
+                if (t2[0]==`BRU) t2[0] <= `NULL;
+                if (t1[1]==`BRU) t1[1] <= `NULL;
+                if (t2[1]==`BRU) t2[1] <= `NULL;
+                if (t1[3]==`BRU) t1[3] <= `NULL;
+                if (t2[3]==`BRU) t2[3] <= `NULL;
+                if (t1[4]==`BRU) t1[4] <= `NULL;
+                if (t2[4]==`BRU) t2[4] <= `NULL;
+                if (t1[5]==`BRU) t1[5] <= `NULL;
+                if (t2[5]==`BRU) t2[5] <= `NULL;
+                if (t1[6]==`BRU) t1[6] <= `NULL;
+                if (t2[6]==`BRU) t2[6] <= `NULL;
+                if (t1[7]==`BRU) t1[7] <= `NULL;
+                if (t2[7]==`BRU) t2[7] <= `NULL;
                 {busy[2],op[2],r[2],r1[2],r2[2],t1[2],t2[2]} <= {1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
                 iptr[2] <= 0;
             end
-            else if (valid_inst[iptr[3]] & writeback[iptr[3]] & iptr[3]==raddr & retire_en[0] & busy[3] & ~(dcache_miss&st_e_r[raddr])) begin
-                // t1[1] <= t1[1] == `ALU1 ? `NULL : t1[1];
-                t1[0] <= t1[0] == `AGU ? `NULL : t1[0];
-                t2[0] <= t2[0] == `AGU ? `NULL : t2[0];
-                t1[1] <= t1[1] == `AGU ? `NULL : t1[1];
-                t2[1] <= t2[1] == `AGU ? `NULL : t2[1];
-                t1[2] <= t1[2] == `AGU ? `NULL : t1[2];
-                t2[2] <= t2[2] == `AGU ? `NULL : t2[2];
-                t1[4] <= t1[4] == `AGU ? `NULL : t1[4];
-                t2[4] <= t2[4] == `AGU ? `NULL : t2[4];
-                t1[5] <= t1[5] == `AGU ? `NULL : t1[5];
-                t2[5] <= t2[5] == `AGU ? `NULL : t2[5];
-                t1[6] <= t1[6] == `AGU ? `NULL : t1[6];
-                t2[6] <= t2[6] == `AGU ? `NULL : t2[6];
-                t1[7] <= t1[7] == `AGU ? `NULL : t1[7];
-                t2[7] <= t2[7] == `AGU ? `NULL : t2[7];
+            if (valid_inst[iptr[3]] & writeback[iptr[3]] & (iptr[3]==raddr & retire_en[0] | iptr[3]==raddr+1'b1 & retire_en[1]) & busy[3] & ~(dcache_miss&(st_e_r[raddr]|b_s))) begin
+                if (t1[0]==`AGU) t1[0] <= `NULL;
+                if (t2[0]==`AGU) t2[0] <= `NULL;
+                if (t1[1]==`AGU) t1[1] <= `NULL;
+                if (t2[1]==`AGU) t2[1] <= `NULL;
+                if (t1[2]==`AGU) t1[2] <= `NULL;
+                if (t2[2]==`AGU) t2[2] <= `NULL;
+                if (t1[4]==`AGU) t1[4] <= `NULL;
+                if (t2[4]==`AGU) t2[4] <= `NULL;
+                if (t1[5]==`AGU) t1[5] <= `NULL;
+                if (t2[5]==`AGU) t2[5] <= `NULL;
+                if (t1[6]==`AGU) t1[6] <= `NULL;
+                if (t2[6]==`AGU) t2[6] <= `NULL;
+                if (t1[7]==`AGU) t1[7] <= `NULL;
+                if (t2[7]==`AGU) t2[7] <= `NULL;
                 {busy[3],op[3],r[3],r1[3],r2[3],t1[3],t2[3]} <= {1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
                 iptr[3] <= 0;
             end
-            else if (valid_inst[iptr[4]] & writeback[iptr[4]] & iptr[4]==raddr & retire_en[0] & busy[4]) begin
-                // t1[1] <= t1[1] == `ALU1 ? `NULL : t1[1];
-                t1[0] <= t1[0] == `HILO ? `NULL : t1[0];
-                t2[0] <= t2[0] == `HILO ? `NULL : t2[0];
-                t1[1] <= t1[1] == `HILO ? `NULL : t1[1];
-                t2[1] <= t2[1] == `HILO ? `NULL : t2[1];
-                t1[2] <= t1[2] == `HILO ? `NULL : t1[2];
-                t2[2] <= t2[2] == `HILO ? `NULL : t2[2];
-                t1[3] <= t1[3] == `HILO ? `NULL : t1[3];
-                t2[3] <= t2[3] == `HILO ? `NULL : t2[3];
-                t1[5] <= t1[5] == `HILO ? `NULL : t1[5];
-                t2[5] <= t2[5] == `HILO ? `NULL : t2[5];
-                t1[6] <= t1[6] == `HILO ? `NULL : t1[6];
-                t2[6] <= t2[6] == `HILO ? `NULL : t2[6];
-                t1[7] <= t1[7] == `HILO ? `NULL : t1[7];
-                t2[7] <= t2[7] == `HILO ? `NULL : t2[7];
+            if (valid_inst[iptr[4]] & writeback[iptr[4]] & (iptr[4]==raddr & retire_en[0] | iptr[4]==raddr+1'b1 & retire_en[1]) & busy[4]) begin
+                if (t1[0]==`HILO) t1[0] <= `NULL;
+                if (t2[0]==`HILO) t2[0] <= `NULL;
+                if (t1[1]==`HILO) t1[1] <= `NULL;
+                if (t2[1]==`HILO) t2[1] <= `NULL;
+                if (t1[2]==`HILO) t1[2] <= `NULL;
+                if (t2[2]==`HILO) t2[2] <= `NULL;
+                if (t1[3]==`HILO) t1[3] <= `NULL;
+                if (t2[3]==`HILO) t2[3] <= `NULL;
+                if (t1[5]==`HILO) t1[5] <= `NULL;
+                if (t2[5]==`HILO) t2[5] <= `NULL;
+                if (t1[6]==`HILO) t1[6] <= `NULL;
+                if (t2[6]==`HILO) t2[6] <= `NULL;
+                if (t1[7]==`HILO) t1[7] <= `NULL;
+                if (t2[7]==`HILO) t2[7] <= `NULL;
                 {busy[4],op[4],r[4],r1[4],r2[4],t1[4],t2[4]} <= {1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
                 iptr[4] <= 0;
             end
-            else if (valid_inst[iptr[5]] & writeback[iptr[5]] & iptr[5]==raddr & retire_en[0] & busy[5]) begin
-                // t1[1] <= t1[1] == `ALU1 ? `NULL : t1[1];
-                t1[0] <= t1[0] == `ALU3 ? `NULL : t1[0];
-                t2[0] <= t2[0] == `ALU3 ? `NULL : t2[0];
-                t1[1] <= t1[1] == `ALU3 ? `NULL : t1[1];
-                t2[1] <= t2[1] == `ALU3 ? `NULL : t2[1];
-                t1[2] <= t1[2] == `ALU3 ? `NULL : t1[2];
-                t2[2] <= t2[2] == `ALU3 ? `NULL : t2[2];
-                t1[3] <= t1[3] == `ALU3 ? `NULL : t1[3];
-                t2[3] <= t2[3] == `ALU3 ? `NULL : t2[3];
-                t1[4] <= t1[4] == `ALU3 ? `NULL : t1[4];
-                t2[4] <= t2[4] == `ALU3 ? `NULL : t2[4];
-                t1[6] <= t1[6] == `ALU3 ? `NULL : t1[6];
-                t2[6] <= t2[6] == `ALU3 ? `NULL : t2[6];
-                t1[7] <= t1[7] == `ALU3 ? `NULL : t1[7];
-                t2[7] <= t2[7] == `ALU3 ? `NULL : t2[7];
+            if (valid_inst[iptr[5]] & writeback[iptr[5]] & (iptr[5]==raddr & retire_en[0] | iptr[5]==raddr+1'b1 & retire_en[1]) & busy[5]) begin
+                if (t1[0]==`ALU3) t1[0] <= `NULL;
+                if (t2[0]==`ALU3) t2[0] <= `NULL;
+                if (t1[1]==`ALU3) t1[1] <= `NULL;
+                if (t2[1]==`ALU3) t2[1] <= `NULL;
+                if (t1[2]==`ALU3) t1[2] <= `NULL;
+                if (t2[2]==`ALU3) t2[2] <= `NULL;
+                if (t1[3]==`ALU3) t1[3] <= `NULL;
+                if (t2[3]==`ALU3) t2[3] <= `NULL;
+                if (t1[4]==`ALU3) t1[4] <= `NULL;
+                if (t2[4]==`ALU3) t2[4] <= `NULL;
+                if (t1[6]==`ALU3) t1[6] <= `NULL;
+                if (t2[6]==`ALU3) t2[6] <= `NULL;
+                if (t1[7]==`ALU3) t1[7] <= `NULL;
+                if (t2[7]==`ALU3) t2[7] <= `NULL;
                 {busy[5],op[5],r[5],r1[5],r2[5],t1[5],t2[5]} <= {1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
                 iptr[5] <= 0;
             end
-            else if (valid_inst[iptr[6]] & writeback[iptr[6]] & iptr[6]==raddr & retire_en[0] & busy[6]) begin
-                // t1[1] <= t1[1] == `ALU1 ? `NULL : t1[1];
-                t1[0] <= t1[0] == `ALU4 ? `NULL : t1[0];
-                t2[0] <= t2[0] == `ALU4 ? `NULL : t2[0];
-                t1[1] <= t1[1] == `ALU4 ? `NULL : t1[1];
-                t2[1] <= t2[1] == `ALU4 ? `NULL : t2[1];
-                t1[2] <= t1[2] == `ALU4 ? `NULL : t1[2];
-                t2[2] <= t2[2] == `ALU4 ? `NULL : t2[2];
-                t1[3] <= t1[3] == `ALU4 ? `NULL : t1[3];
-                t2[3] <= t2[3] == `ALU4 ? `NULL : t2[3];
-                t1[4] <= t1[4] == `ALU4 ? `NULL : t1[4];
-                t2[4] <= t2[4] == `ALU4 ? `NULL : t2[4];
-                t1[5] <= t1[5] == `ALU4 ? `NULL : t1[5];
-                t2[5] <= t2[5] == `ALU4 ? `NULL : t2[5];
-                t1[7] <= t1[7] == `ALU4 ? `NULL : t1[7];
-                t2[7] <= t2[7] == `ALU4 ? `NULL : t2[7];
+            if (valid_inst[iptr[6]] & writeback[iptr[6]] & (iptr[6]==raddr & retire_en[0] | iptr[6]==raddr+1'b1 & retire_en[1]) & busy[6]) begin
+                if (t1[0]==`ALU4) t1[0] <= `NULL;
+                if (t2[0]==`ALU4) t2[0] <= `NULL;
+                if (t1[1]==`ALU4) t1[1] <= `NULL;
+                if (t2[1]==`ALU4) t2[1] <= `NULL;
+                if (t1[2]==`ALU4) t1[2] <= `NULL;
+                if (t2[2]==`ALU4) t2[2] <= `NULL;
+                if (t1[3]==`ALU4) t1[3] <= `NULL;
+                if (t2[3]==`ALU4) t2[3] <= `NULL;
+                if (t1[4]==`ALU4) t1[4] <= `NULL;
+                if (t2[4]==`ALU4) t2[4] <= `NULL;
+                if (t1[5]==`ALU4) t1[5] <= `NULL;
+                if (t2[5]==`ALU4) t2[5] <= `NULL;
+                if (t1[7]==`ALU4) t1[7] <= `NULL;
+                if (t2[7]==`ALU4) t2[7] <= `NULL;
                 {busy[6],op[6],r[6],r1[6],r2[6],t1[6],t2[6]} <= {1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
                 iptr[6] <= 0;
             end
-            if (dispatch_ok) begin
+            if (dispatch2_ok) begin
                 iptr[fu_ptr] <= inst_status[dptr][`ADDR];
                 busy[fu_ptr] <= 1'b1;
                 op[fu_ptr] <= inst_status[dptr][`OP];
                 r[fu_ptr] <= inst_status[dptr][`REG3];
                 r1[fu_ptr] <= inst_status[dptr][`R1VAL] ? inst_status[dptr][`REG1] : 6'b111111;
                 r2[fu_ptr] <= inst_status[dptr][`R2VAL] ? inst_status[dptr][`REG2] : 6'b111111;
-                t1[fu_ptr] <= inst_status[dptr][`R1VAL] ? (valid_inst[raddr] & writeback[raddr] & inst_status[dptr][`REG1]==inst_status[raddr][`REG3] ? `NULL : reg_status[inst_status[dptr][`REG1]]) : `NULL;
-                t2[fu_ptr] <= inst_status[dptr][`R2VAL] ? (valid_inst[raddr] & writeback[raddr] & inst_status[dptr][`REG2]==inst_status[raddr][`REG3] ? `NULL : reg_status[inst_status[dptr][`REG2]]) : `NULL;
+                t1[fu_ptr] <= ~inst_status[dptr][`R1VAL] ? `NULL : 
+                                retire_en[0] & inst_status[dptr][`REG1]==inst_status[raddr][`REG3] ? `NULL : 
+                                retire_en[1] & inst_status[dptr][`REG1]==inst_status[raddr+1'b1][`REG3] ? `NULL : reg_status[inst_status[dptr][`REG1]];
+                t2[fu_ptr] <= ~inst_status[dptr][`R2VAL] ? `NULL : 
+                                retire_en[0] & inst_status[dptr][`REG2]==inst_status[raddr][`REG3] ? `NULL : 
+                                retire_en[1] & inst_status[dptr][`REG2]==inst_status[raddr+1'b1][`REG3] ? `NULL : reg_status[inst_status[dptr][`REG2]];
+                iptr[fu_ptr2] <= inst_status[dptr+1'b1][`ADDR];
+                busy[fu_ptr2] <= 1'b1;
+                op[fu_ptr2] <= inst_status[dptr+1'b1][`OP];
+                r[fu_ptr2] <= inst_status[dptr+1'b1][`REG3];
+                r1[fu_ptr2] <= inst_status[dptr+1'b1][`R1VAL] ? inst_status[dptr+1'b1][`REG1] : 6'b111111;
+                r2[fu_ptr2] <= inst_status[dptr+1'b1][`R2VAL] ? inst_status[dptr+1'b1][`REG2] : 6'b111111;
+                t1[fu_ptr2] <= ~inst_status[dptr+1'b1][`R1VAL] ? `NULL : 
+                                retire_en[0] & inst_status[dptr+1'b1][`REG1]==inst_status[raddr][`REG3] ? `NULL : 
+                                retire_en[1] & inst_status[dptr+1'b1][`REG1]==inst_status[raddr+1'b1][`REG3] ? `NULL : 
+                                inst_status[dptr+1'b1][`REG1]==inst_status[dptr][`REG3] & inst_status[dptr][`REG3]!=0 & inst_status[dptr][`WE] ? inst_status[dptr][`FU] : reg_status[inst_status[dptr+1'b1][`REG1]];
+                t2[fu_ptr2] <= ~inst_status[dptr+1'b1][`R2VAL] ? `NULL :
+                                retire_en[0] & inst_status[dptr+1'b1][`REG2]==inst_status[raddr][`REG3] ? `NULL :
+                                retire_en[1] & inst_status[dptr+1'b1][`REG2]==inst_status[raddr+1'b1][`REG3] ? `NULL :
+                                inst_status[dptr+1'b1][`REG2]==inst_status[dptr][`REG3] & inst_status[dptr][`REG3]!=0 & inst_status[dptr][`WE] ? inst_status[dptr][`FU] : reg_status[inst_status[dptr+1'b1][`REG2]];
+            end
+            else if (dispatch1_ok) begin
+                iptr[fu_ptr] <= inst_status[dptr][`ADDR];
+                busy[fu_ptr] <= 1'b1;
+                op[fu_ptr] <= inst_status[dptr][`OP];
+                r[fu_ptr] <= inst_status[dptr][`REG3];
+                r1[fu_ptr] <= inst_status[dptr][`R1VAL] ? inst_status[dptr][`REG1] : 6'b111111;
+                r2[fu_ptr] <= inst_status[dptr][`R2VAL] ? inst_status[dptr][`REG2] : 6'b111111;
+                t1[fu_ptr] <= ~inst_status[dptr][`R1VAL] ? `NULL : 
+                                retire_en[0] & inst_status[dptr][`REG1]==inst_status[raddr][`REG3] ? `NULL : 
+                                retire_en[1] & inst_status[dptr][`REG1]==inst_status[raddr+1'b1][`REG3] ? `NULL : reg_status[inst_status[dptr][`REG1]];
+                t2[fu_ptr] <= ~inst_status[dptr][`R2VAL] ? `NULL : 
+                                retire_en[0] & inst_status[dptr][`REG2]==inst_status[raddr][`REG3] ? `NULL : 
+                                retire_en[1] & inst_status[dptr][`REG2]==inst_status[raddr+1'b1][`REG3] ? `NULL : reg_status[inst_status[dptr][`REG2]];
             end
         end
     end
@@ -559,9 +615,9 @@ module scoreboard(
             reg_status[31] <= `NULL;
             reg_status[32] <= `NULL;
             reg_status[33] <= `NULL;
-            if (dispatch_ok) begin
-                reg_status[inst_status[dptr][`REG3]] <= inst_status[dptr][`REG3]==0 ? `NULL : inst_status[dptr][`FU];
-            end
+            // if (dispatch1_ok & ds_ptr==dptr) begin
+            //     reg_status[inst_status[dptr][`REG3]] <= inst_status[dptr][`REG3]==0 ? `NULL : inst_status[dptr][`FU];
+            // end
         end
         else begin
             // if (valid_inst[iptr[0]] & writeback[iptr[0]]) begin
@@ -573,10 +629,17 @@ module scoreboard(
             // if (valid_inst[iptr[3]] & writeback[iptr[3]]) begin
             //     reg_status[inst_status[iptr[3]][`REG3]] <= `NULL;
             // end
-            if (valid_inst[raddr] & writeback[raddr]) begin
+            if (valid_inst[raddr] & writeback[raddr] & retire_en[0]) begin
                 reg_status[inst_status[raddr][`REG3]] <= `NULL;
             end
-            if (dispatch_ok) begin
+            if (valid_inst[raddr+1'b1] & writeback[raddr+1'b1] & retire_en[1])begin
+                reg_status[inst_status[raddr+1'b1][`REG3]] <= `NULL;
+            end
+            if (dispatch2_ok) begin
+                reg_status[inst_status[dptr][`REG3]] <= inst_status[dptr][`REG3]==0 ? `NULL : inst_status[dptr][`FU];
+                reg_status[inst_status[dptr+1'b1][`REG3]] <= inst_status[dptr+1'b1][`REG3]==0 ? `NULL : inst_status[dptr+1'b1][`FU];
+            end
+            else if (dispatch1_ok) begin
                 reg_status[inst_status[dptr][`REG3]] <= inst_status[dptr][`REG3]==0 ? `NULL : inst_status[dptr][`FU];
             end
         end
@@ -613,10 +676,24 @@ module scoreboard(
     assign rf_waddr[0] = retire_en[0] ? inst_status[raddr][`REG3] : 6'b0;
     assign rf_wdata[0] = retire_en[0] ? {cb_extra[raddr], cb[raddr]} : 64'b0;
 
-    assign debug_wb_pc = retire_en[0] ? inst_status[raddr][`PC] : 32'b0;
-    assign debug_wb_rf_wen = {4{rf_we_o[0]}};
-    assign debug_wb_rf_wnum = rf_waddr[0];
-    assign debug_wb_rf_wdata = rf_wdata[0][31:0];
+    assign rf_we_o[1] = retire_en[1] ? rf_we_r[raddr+1'b1] : 1'b0;
+    assign rf_waddr[1] = retire_en[1] ? inst_status[raddr+1'b1][`REG3] : 6'b0;
+    assign rf_wdata[1] = retire_en[1] ? {cb_extra[raddr+1'b1], cb[raddr+1'b1]} : 64'b0;
+
+    reg debug_way;
+    always @ (posedge clk or negedge clk) begin
+        if (!resetn) begin
+            debug_way <= 1'b0;
+        end
+        else begin
+            debug_way <= ~debug_way;
+        end
+    end
+
+    assign debug_wb_pc = ~debug_way ? (retire_en[0] ? inst_status[raddr][`PC] : 32'b0) : (retire_en[1] ? inst_status[raddr+1'b1][`PC] : 32'b0);
+    assign debug_wb_rf_wen = ~debug_way ? {4{rf_we_o[0]}} : {4{rf_we_o[1]}};
+    assign debug_wb_rf_wnum = ~debug_way ? rf_waddr[0] : rf_waddr[1];
+    assign debug_wb_rf_wdata = ~debug_way ? rf_wdata[0][31:0] : rf_wdata[1][31:0];
 
     regfile u_regfile(
     	.clk     (clk     ),
@@ -711,7 +788,7 @@ module scoreboard(
     	.clk             (clk               ),
         .resetn          (resetn            ),
         .ready           (fu_rdy[3]         ),
-//        .dcache_miss     (dcache_miss       ),
+        //.dcache_miss     (dcache_miss       ),
         .op              (op[3]             ),
         .inst_status     (inst_status[iptr[3]]),
         .rdata1          (rdata1[3]         ),
@@ -806,18 +883,18 @@ module scoreboard(
             if (br_bus[32]) begin
                 br_e_r <= 16'b0;
                 st_e_r <= 16'b0;
-                st_e_r[raddr+1'b1] <= st_e_r[raddr+1'b1];
+                // st_e_r[raddr+1'b1] <= st_e_r[raddr+1'b1];
             end 
-            if (retire_en[0] & ~(dcache_miss&st_e_r[raddr])) st_e_r[raddr] <= 1'b0;
+            if (retire_en[0] & ~(dcache_miss&(st_e_r[raddr]|b_s))) st_e_r[raddr] <= 1'b0;
         end
     end
 
     assign br_bus = {br_e_r[raddr]&retire_en[0], {32{retire_en[0]}}&cb_extra[raddr]};
 
-    assign data_sram_en = (retire_en[0] & st_e_r[raddr]) ? 1'b1 : agu_sram_en;
-    assign data_sram_wen = (retire_en[0] & st_e_r[raddr]) ? st_sel_r[raddr] : agu_sram_wen;
-    assign data_sram_addr = (retire_en[0] & st_e_r[raddr]) ? cb_extra[raddr] : agu_sram_addr;
-    assign data_sram_wdata = (retire_en[0] & st_e_r[raddr]) ? cb[raddr] : agu_sram_wdata;
+    assign data_sram_en = b_s ? 1'b1 : (retire_en[0] & st_e_r[raddr]) ? 1'b1 : agu_sram_en;
+    assign data_sram_wen = b_s ? st_sel_r[raddr+1'b1] : (retire_en[0] & st_e_r[raddr]) ? st_sel_r[raddr] : agu_sram_wen;
+    assign data_sram_addr = b_s ? cb_extra[raddr+1'b1] : (retire_en[0] & st_e_r[raddr]) ? cb_extra[raddr] : agu_sram_addr;
+    assign data_sram_wdata = b_s ? cb[raddr+1'b1] : (retire_en[0] & st_e_r[raddr]) ? cb[raddr] : agu_sram_wdata;
 
     
     assign wb_ok[0] = ~(r[0]==r1[1] & t1[1]!=`ALU1 & ~issue[iptr[1]] |
