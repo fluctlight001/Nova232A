@@ -408,13 +408,13 @@ module scoreboard(
     end
     
     // assign fu_rdy[0] = (t1[0] == `NULL) & (t2[0] == `NULL);
-    assign fu_rdy[0] = dispatch[iptr[0]] & ~issue[iptr[0]] & (t1[0] == `NULL) & (t2[0] == `NULL) & (inst_status[iptr[0]][`FU] == `ALU1);
-    assign fu_rdy[1] = dispatch[iptr[1]] & ~issue[iptr[1]] & (t1[1] == `NULL) & (t2[1] == `NULL) & (inst_status[iptr[1]][`FU] == `ALU2);
-    assign fu_rdy[2] = dispatch[iptr[2]] & ~issue[iptr[2]] & (t1[2] == `NULL) & (t2[2] == `NULL) & (inst_status[iptr[2]][`FU] == `BRU );
-    assign fu_rdy[3] = dispatch[iptr[3]] & ~issue[iptr[3]] & (t1[3] == `NULL) & (t2[3] == `NULL) & (inst_status[iptr[3]][`FU] == `AGU );
-    assign fu_rdy[4] = dispatch[iptr[4]] & ~issue[iptr[4]] & (t1[4] == `NULL) & (t2[4] == `NULL) & (inst_status[iptr[4]][`FU] == `HILO);
-    assign fu_rdy[5] = dispatch[iptr[5]] & ~issue[iptr[5]] & (t1[5] == `NULL) & (t2[5] == `NULL) & (inst_status[iptr[5]][`FU] == `ALU3);
-    assign fu_rdy[6] = dispatch[iptr[6]] & ~issue[iptr[6]] & (t1[6] == `NULL) & (t2[6] == `NULL) & (inst_status[iptr[6]][`FU] == `ALU4);
+    assign fu_rdy[0] = dispatch[iptr[0]] & ~issue[iptr[0]] & (t1[0] == `NULL | retire_en[0]&t1[0]=={1'b0,raddr} | retire_en[1]&t1[0]=={1'b0,raddr+1'b1}) & (t2[0] == `NULL | retire_en[0]&t2[0]=={1'b0,raddr} | retire_en[1]&t2[0]=={1'b0,raddr+1'b1}) & (inst_status[iptr[0]][`FU] == `ALU1);
+    assign fu_rdy[1] = dispatch[iptr[1]] & ~issue[iptr[1]] & (t1[1] == `NULL | retire_en[0]&t1[1]=={1'b0,raddr} | retire_en[1]&t1[1]=={1'b0,raddr+1'b1}) & (t2[1] == `NULL | retire_en[0]&t2[1]=={1'b0,raddr} | retire_en[1]&t2[1]=={1'b0,raddr+1'b1}) & (inst_status[iptr[1]][`FU] == `ALU2);
+    assign fu_rdy[2] = dispatch[iptr[2]] & ~issue[iptr[2]] & (t1[2] == `NULL | retire_en[0]&t1[2]=={1'b0,raddr} | retire_en[1]&t1[2]=={1'b0,raddr+1'b1}) & (t2[2] == `NULL | retire_en[0]&t2[2]=={1'b0,raddr} | retire_en[1]&t2[2]=={1'b0,raddr+1'b1}) & (inst_status[iptr[2]][`FU] == `BRU );
+    assign fu_rdy[3] = dispatch[iptr[3]] & ~issue[iptr[3]] & (t1[3] == `NULL | retire_en[0]&t1[3]=={1'b0,raddr} | retire_en[1]&t1[3]=={1'b0,raddr+1'b1}) & (t2[3] == `NULL | retire_en[0]&t2[3]=={1'b0,raddr} | retire_en[1]&t2[3]=={1'b0,raddr+1'b1}) & (inst_status[iptr[3]][`FU] == `AGU );
+    assign fu_rdy[4] = dispatch[iptr[4]] & ~issue[iptr[4]] & (t1[4] == `NULL | retire_en[0]&t1[4]=={1'b0,raddr} | retire_en[1]&t1[4]=={1'b0,raddr+1'b1}) & (t2[4] == `NULL | retire_en[0]&t2[4]=={1'b0,raddr} | retire_en[1]&t2[4]=={1'b0,raddr+1'b1}) & (inst_status[iptr[4]][`FU] == `HILO);
+    assign fu_rdy[5] = dispatch[iptr[5]] & ~issue[iptr[5]] & (t1[5] == `NULL | retire_en[0]&t1[5]=={1'b0,raddr} | retire_en[1]&t1[5]=={1'b0,raddr+1'b1}) & (t2[5] == `NULL | retire_en[0]&t2[5]=={1'b0,raddr} | retire_en[1]&t2[5]=={1'b0,raddr+1'b1}) & (inst_status[iptr[5]][`FU] == `ALU3);
+    assign fu_rdy[6] = dispatch[iptr[6]] & ~issue[iptr[6]] & (t1[6] == `NULL | retire_en[0]&t1[6]=={1'b0,raddr} | retire_en[1]&t1[6]=={1'b0,raddr+1'b1}) & (t2[6] == `NULL | retire_en[0]&t2[6]=={1'b0,raddr} | retire_en[1]&t2[6]=={1'b0,raddr+1'b1}) & (inst_status[iptr[6]][`FU] == `ALU4);
     assign fu_rdy[7] = dispatch[iptr[7]] & ~issue[iptr[7]] & (t1[7] == `NULL) & (t2[7] == `NULL) & (inst_status[iptr[7]][`FU] == 4'd7 );
 
     always @ (posedge clk) begin
