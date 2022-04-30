@@ -49,7 +49,9 @@
 `define HILO 3'b100
 `define ALU3 3'b101
 `define ALU4 3'b110
-`define NULL 3'b111
+`define ERR  3'b111
+
+`define NULL 5'b10000
 
 // cache
 `define TAG_WIDTH 21    // tag + v
