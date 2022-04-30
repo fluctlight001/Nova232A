@@ -135,14 +135,14 @@ module scoreboard(
 
     assign dispatch1_ok = valid_inst[dptr] 
                         & ~dispatch[dptr]
-                        & ~busy[inst_status[dptr][`FU]]
-                        & reg_status[inst_status[dptr][`REG3]]==`NULL
+                        & (~busy[inst_status[dptr][`FU]] | retire_en[0]&inst_status[dptr][`FU]==inst_status[raddr][`FU] | retire_en[1]&inst_status[dptr][`FU]==inst_status[raddr+1'b1][`FU])
+                        // & reg_status[inst_status[dptr][`REG3]]==`NULL
                         & !br_bus[32];// | dptr == raddr+1'b1);
     assign dispatch2_ok = valid_inst[dptr+1'b1] 
                         & ~dispatch[dptr+1'b1] 
-                        & ~busy[inst_status[dptr+1'b1][`FU]] 
+                        & (~busy[inst_status[dptr+1'b1][`FU]]  | retire_en[0]&inst_status[dptr+1'b1][`FU]==inst_status[raddr][`FU] | retire_en[1]&inst_status[dptr+1'b1][`FU]==inst_status[raddr+1'b1][`FU])
                         & inst_status[dptr][`FU]!=inst_status[dptr+1'b1][`FU] 
-                        & reg_status[inst_status[dptr+1'b1][`REG3]]==`NULL //& (inst_status[dptr+1'b1][`REG3]!=inst_status[dptr][`REG3] | inst_status[dptr+1'b1][`REG3]==0) 
+                        // & reg_status[inst_status[dptr+1'b1][`REG3]]==`NULL //& (inst_status[dptr+1'b1][`REG3]!=inst_status[dptr][`REG3] | inst_status[dptr+1'b1][`REG3]==0) 
                         & !br_bus[32] 
                         & dispatch1_ok;
                         
@@ -366,12 +366,12 @@ module scoreboard(
                 r1[fu_ptr] <= inst_status[dptr][`R1VAL] ? inst_status[dptr][`REG1] : 6'b111111;
                 r2[fu_ptr] <= inst_status[dptr][`R2VAL] ? inst_status[dptr][`REG2] : 6'b111111;
                 t1[fu_ptr] <= ~inst_status[dptr][`R1VAL] ? `NULL : 
-                                retire_en[0] & inst_status[dptr][`REG1]==inst_status[raddr][`REG3] & reg_status[inst_status[raddr][`REG3]]=={1'b0, raddr} ? `NULL : 
                                 retire_en[1] & inst_status[dptr][`REG1]==inst_status[raddr+1'b1][`REG3] & reg_status[inst_status[raddr+1'b1][`REG3]]=={1'b0, raddr+1'b1} ? `NULL : 
+                                retire_en[0] & inst_status[dptr][`REG1]==inst_status[raddr][`REG3] & reg_status[inst_status[raddr][`REG3]]=={1'b0, raddr} ? `NULL : 
                                 reg_status[inst_status[dptr][`REG1]];
                 t2[fu_ptr] <= ~inst_status[dptr][`R2VAL] ? `NULL : 
-                                retire_en[0] & inst_status[dptr][`REG2]==inst_status[raddr][`REG3] & reg_status[inst_status[raddr][`REG3]]=={1'b0, raddr} ? `NULL : 
                                 retire_en[1] & inst_status[dptr][`REG2]==inst_status[raddr+1'b1][`REG3] & reg_status[inst_status[raddr+1'b1][`REG3]]=={1'b0, raddr+1'b1} ? `NULL : 
+                                retire_en[0] & inst_status[dptr][`REG2]==inst_status[raddr][`REG3] & reg_status[inst_status[raddr][`REG3]]=={1'b0, raddr} ? `NULL : 
                                 reg_status[inst_status[dptr][`REG2]];
                 iptr[fu_ptr2] <= inst_status[dptr+1'b1][`ADDR];
                 busy[fu_ptr2] <= 1'b1;
@@ -380,13 +380,15 @@ module scoreboard(
                 r1[fu_ptr2] <= inst_status[dptr+1'b1][`R1VAL] ? inst_status[dptr+1'b1][`REG1] : 6'b111111;
                 r2[fu_ptr2] <= inst_status[dptr+1'b1][`R2VAL] ? inst_status[dptr+1'b1][`REG2] : 6'b111111;
                 t1[fu_ptr2] <= ~inst_status[dptr+1'b1][`R1VAL] ? `NULL : 
-                                retire_en[0] & inst_status[dptr+1'b1][`REG1]==inst_status[raddr][`REG3] & reg_status[inst_status[raddr][`REG3]]=={1'b0, raddr} ? `NULL : 
+                                inst_status[dptr+1'b1][`REG1]==inst_status[dptr][`REG3] & inst_status[dptr][`REG3]!=0 & inst_status[dptr][`WE] ? {1'b0, dptr} : 
                                 retire_en[1] & inst_status[dptr+1'b1][`REG1]==inst_status[raddr+1'b1][`REG3] & reg_status[inst_status[raddr+1'b1][`REG3]]=={1'b0, raddr+1'b1} ? `NULL : 
-                                inst_status[dptr+1'b1][`REG1]==inst_status[dptr][`REG3] & inst_status[dptr][`REG3]!=0 & inst_status[dptr][`WE] ? {1'b0, dptr} : reg_status[inst_status[dptr+1'b1][`REG1]];
+                                retire_en[0] & inst_status[dptr+1'b1][`REG1]==inst_status[raddr][`REG3] & reg_status[inst_status[raddr][`REG3]]=={1'b0, raddr} ? `NULL : 
+                                reg_status[inst_status[dptr+1'b1][`REG1]];
                 t2[fu_ptr2] <= ~inst_status[dptr+1'b1][`R2VAL] ? `NULL :
-                                retire_en[0] & inst_status[dptr+1'b1][`REG2]==inst_status[raddr][`REG3] & reg_status[inst_status[raddr][`REG3]]=={1'b0, raddr} ? `NULL :
+                                inst_status[dptr+1'b1][`REG2]==inst_status[dptr][`REG3] & inst_status[dptr][`REG3]!=0 & inst_status[dptr][`WE] ? {1'b0, dptr} : 
                                 retire_en[1] & inst_status[dptr+1'b1][`REG2]==inst_status[raddr+1'b1][`REG3] & reg_status[inst_status[raddr+1'b1][`REG3]]=={1'b0, raddr+1'b1} ? `NULL :
-                                inst_status[dptr+1'b1][`REG2]==inst_status[dptr][`REG3] & inst_status[dptr][`REG3]!=0 & inst_status[dptr][`WE] ? {1'b0, dptr} : reg_status[inst_status[dptr+1'b1][`REG2]];
+                                retire_en[0] & inst_status[dptr+1'b1][`REG2]==inst_status[raddr][`REG3] & reg_status[inst_status[raddr][`REG3]]=={1'b0, raddr} ? `NULL :
+                                reg_status[inst_status[dptr+1'b1][`REG2]];
             end
             else if (dispatch1_ok) begin
                 iptr[fu_ptr] <= inst_status[dptr][`ADDR];
@@ -396,25 +398,32 @@ module scoreboard(
                 r1[fu_ptr] <= inst_status[dptr][`R1VAL] ? inst_status[dptr][`REG1] : 6'b111111;
                 r2[fu_ptr] <= inst_status[dptr][`R2VAL] ? inst_status[dptr][`REG2] : 6'b111111;
                 t1[fu_ptr] <= ~inst_status[dptr][`R1VAL] ? `NULL : 
-                                retire_en[0] & inst_status[dptr][`REG1]==inst_status[raddr][`REG3] & reg_status[inst_status[raddr][`REG3]]=={1'b0, raddr} ? `NULL : 
                                 retire_en[1] & inst_status[dptr][`REG1]==inst_status[raddr+1'b1][`REG3] & reg_status[inst_status[raddr+1'b1][`REG3]]=={1'b0, raddr+1'b1} ? `NULL : 
+                                retire_en[0] & inst_status[dptr][`REG1]==inst_status[raddr][`REG3] & reg_status[inst_status[raddr][`REG3]]=={1'b0, raddr} ? `NULL : 
                                 reg_status[inst_status[dptr][`REG1]];
                 t2[fu_ptr] <= ~inst_status[dptr][`R2VAL] ? `NULL : 
-                                retire_en[0] & inst_status[dptr][`REG2]==inst_status[raddr][`REG3] & reg_status[inst_status[raddr][`REG3]]=={1'b0, raddr} ? `NULL : 
                                 retire_en[1] & inst_status[dptr][`REG2]==inst_status[raddr+1'b1][`REG3] & reg_status[inst_status[raddr+1'b1][`REG3]]=={1'b0, raddr+1'b1} ? `NULL : 
+                                retire_en[0] & inst_status[dptr][`REG2]==inst_status[raddr][`REG3] & reg_status[inst_status[raddr][`REG3]]=={1'b0, raddr} ? `NULL : 
                                 reg_status[inst_status[dptr][`REG2]];
             end
         end
     end
     
     // assign fu_rdy[0] = (t1[0] == `NULL) & (t2[0] == `NULL);
-    assign fu_rdy[0] = dispatch[iptr[0]] & ~issue[iptr[0]] & (t1[0] == `NULL | retire_en[0]&t1[0]=={1'b0,raddr} | retire_en[1]&t1[0]=={1'b0,raddr+1'b1}) & (t2[0] == `NULL | retire_en[0]&t2[0]=={1'b0,raddr} | retire_en[1]&t2[0]=={1'b0,raddr+1'b1}) & (inst_status[iptr[0]][`FU] == `ALU1);
-    assign fu_rdy[1] = dispatch[iptr[1]] & ~issue[iptr[1]] & (t1[1] == `NULL | retire_en[0]&t1[1]=={1'b0,raddr} | retire_en[1]&t1[1]=={1'b0,raddr+1'b1}) & (t2[1] == `NULL | retire_en[0]&t2[1]=={1'b0,raddr} | retire_en[1]&t2[1]=={1'b0,raddr+1'b1}) & (inst_status[iptr[1]][`FU] == `ALU2);
-    assign fu_rdy[2] = dispatch[iptr[2]] & ~issue[iptr[2]] & (t1[2] == `NULL | retire_en[0]&t1[2]=={1'b0,raddr} | retire_en[1]&t1[2]=={1'b0,raddr+1'b1}) & (t2[2] == `NULL | retire_en[0]&t2[2]=={1'b0,raddr} | retire_en[1]&t2[2]=={1'b0,raddr+1'b1}) & (inst_status[iptr[2]][`FU] == `BRU );
-    assign fu_rdy[3] = dispatch[iptr[3]] & ~issue[iptr[3]] & (t1[3] == `NULL | retire_en[0]&t1[3]=={1'b0,raddr} | retire_en[1]&t1[3]=={1'b0,raddr+1'b1}) & (t2[3] == `NULL | retire_en[0]&t2[3]=={1'b0,raddr} | retire_en[1]&t2[3]=={1'b0,raddr+1'b1}) & (inst_status[iptr[3]][`FU] == `AGU );
-    assign fu_rdy[4] = dispatch[iptr[4]] & ~issue[iptr[4]] & (t1[4] == `NULL | retire_en[0]&t1[4]=={1'b0,raddr} | retire_en[1]&t1[4]=={1'b0,raddr+1'b1}) & (t2[4] == `NULL | retire_en[0]&t2[4]=={1'b0,raddr} | retire_en[1]&t2[4]=={1'b0,raddr+1'b1}) & (inst_status[iptr[4]][`FU] == `HILO);
-    assign fu_rdy[5] = dispatch[iptr[5]] & ~issue[iptr[5]] & (t1[5] == `NULL | retire_en[0]&t1[5]=={1'b0,raddr} | retire_en[1]&t1[5]=={1'b0,raddr+1'b1}) & (t2[5] == `NULL | retire_en[0]&t2[5]=={1'b0,raddr} | retire_en[1]&t2[5]=={1'b0,raddr+1'b1}) & (inst_status[iptr[5]][`FU] == `ALU3);
-    assign fu_rdy[6] = dispatch[iptr[6]] & ~issue[iptr[6]] & (t1[6] == `NULL | retire_en[0]&t1[6]=={1'b0,raddr} | retire_en[1]&t1[6]=={1'b0,raddr+1'b1}) & (t2[6] == `NULL | retire_en[0]&t2[6]=={1'b0,raddr} | retire_en[1]&t2[6]=={1'b0,raddr+1'b1}) & (inst_status[iptr[6]][`FU] == `ALU4);
+    assign fu_rdy[0] = dispatch[iptr[0]] & ~issue[iptr[0]] & (t1[0] == `NULL | retire_en[0]&t1[0]=={1'b0,raddr} | retire_en[1]&t1[0]=={1'b0,raddr+1'b1} | t1[0]!=`NULL & cb_we[inst_status[t1[0][3:0]][`FU]]) 
+                    & (t2[0] == `NULL | retire_en[0]&t2[0]=={1'b0,raddr} | retire_en[1]&t2[0]=={1'b0,raddr+1'b1} | t2[0]!=`NULL & cb_we[inst_status[t2[0][3:0]][`FU]]) & (inst_status[iptr[0]][`FU] == `ALU1);
+    assign fu_rdy[1] = dispatch[iptr[1]] & ~issue[iptr[1]] & (t1[1] == `NULL | retire_en[0]&t1[1]=={1'b0,raddr} | retire_en[1]&t1[1]=={1'b0,raddr+1'b1} | t1[1]!=`NULL & cb_we[inst_status[t1[1][3:0]][`FU]]) 
+                    & (t2[1] == `NULL | retire_en[0]&t2[1]=={1'b0,raddr} | retire_en[1]&t2[1]=={1'b0,raddr+1'b1} | t2[1]!=`NULL & cb_we[inst_status[t2[1][3:0]][`FU]]) & (inst_status[iptr[1]][`FU] == `ALU2);
+    assign fu_rdy[2] = dispatch[iptr[2]] & ~issue[iptr[2]] & (t1[2] == `NULL | retire_en[0]&t1[2]=={1'b0,raddr} | retire_en[1]&t1[2]=={1'b0,raddr+1'b1} | t1[2]!=`NULL & cb_we[inst_status[t1[2][3:0]][`FU]]) 
+                    & (t2[2] == `NULL | retire_en[0]&t2[2]=={1'b0,raddr} | retire_en[1]&t2[2]=={1'b0,raddr+1'b1} | t2[2]!=`NULL & cb_we[inst_status[t2[2][3:0]][`FU]]) & (inst_status[iptr[2]][`FU] == `BRU );
+    assign fu_rdy[3] = dispatch[iptr[3]] & ~issue[iptr[3]] & (t1[3] == `NULL | retire_en[0]&t1[3]=={1'b0,raddr} | retire_en[1]&t1[3]=={1'b0,raddr+1'b1} | t1[3]!=`NULL & cb_we[inst_status[t1[3][3:0]][`FU]]) 
+                    & (t2[3] == `NULL | retire_en[0]&t2[3]=={1'b0,raddr} | retire_en[1]&t2[3]=={1'b0,raddr+1'b1} | t2[3]!=`NULL & cb_we[inst_status[t2[3][3:0]][`FU]]) & (inst_status[iptr[3]][`FU] == `AGU );
+    assign fu_rdy[4] = dispatch[iptr[4]] & ~issue[iptr[4]] & (t1[4] == `NULL | retire_en[0]&t1[4]=={1'b0,raddr} | retire_en[1]&t1[4]=={1'b0,raddr+1'b1}) 
+                    & (t2[4] == `NULL | retire_en[0]&t2[4]=={1'b0,raddr} | retire_en[1]&t2[4]=={1'b0,raddr+1'b1}) & (inst_status[iptr[4]][`FU] == `HILO);
+    assign fu_rdy[5] = dispatch[iptr[5]] & ~issue[iptr[5]] & (t1[5] == `NULL | retire_en[0]&t1[5]=={1'b0,raddr} | retire_en[1]&t1[5]=={1'b0,raddr+1'b1} | t1[5]!=`NULL & cb_we[inst_status[t1[5][3:0]][`FU]]) 
+                    & (t2[5] == `NULL | retire_en[0]&t2[5]=={1'b0,raddr} | retire_en[1]&t2[5]=={1'b0,raddr+1'b1} | t2[5]!=`NULL & cb_we[inst_status[t2[5][3:0]][`FU]]) & (inst_status[iptr[5]][`FU] == `ALU3);
+    assign fu_rdy[6] = dispatch[iptr[6]] & ~issue[iptr[6]] & (t1[6] == `NULL | retire_en[0]&t1[6]=={1'b0,raddr} | retire_en[1]&t1[6]=={1'b0,raddr+1'b1} | t1[6]!=`NULL & cb_we[inst_status[t1[6][3:0]][`FU]]) 
+                    & (t2[6] == `NULL | retire_en[0]&t2[6]=={1'b0,raddr} | retire_en[1]&t2[6]=={1'b0,raddr+1'b1} | t2[6]!=`NULL & cb_we[inst_status[t2[6][3:0]][`FU]]) & (inst_status[iptr[6]][`FU] == `ALU4);
     assign fu_rdy[7] = dispatch[iptr[7]] & ~issue[iptr[7]] & (t1[7] == `NULL) & (t2[7] == `NULL) & (inst_status[iptr[7]][`FU] == 4'd7 );
 
     always @ (posedge clk) begin
@@ -607,15 +616,35 @@ module scoreboard(
     wire [31:0] fu_rdata1 [7:0];
     wire [31:0] fu_rdata2 [7:0];
 
-    // assign fu_rdata1 = 
+    // assign fu_rdata1[0] = cb_we[inst_status[t1[0][3:0]][`FU]] ? wdata[0] : rdata1[0];
+    // assign fu_rdata2[0] = cb_we[inst_status[t2[0][3:0]][`FU]] ? wdata[0] : rdata2[0];
+    // assign fu_rdata1[0] = t1[0]!=`NULL & cb_we[inst_status[t1[0][3:0]][`FU]] ? wdata[inst_status[t1[0][3:0]][`FU]] : rdata1[0];
+    assign fu_rdata1[0] = t1[0]!=`NULL & cb_we[inst_status[t1[0][3:0]][`FU]] ? wdata[inst_status[t1[0][3:0]][`FU]] : rdata1[0];
+    assign fu_rdata2[0] = t2[0]!=`NULL & cb_we[inst_status[t2[0][3:0]][`FU]] ? wdata[inst_status[t2[0][3:0]][`FU]] : rdata2[0];
+    assign fu_rdata1[1] = t1[1]!=`NULL & cb_we[inst_status[t1[1][3:0]][`FU]] ? wdata[inst_status[t1[1][3:0]][`FU]] : rdata1[1];
+    assign fu_rdata2[1] = t2[1]!=`NULL & cb_we[inst_status[t2[1][3:0]][`FU]] ? wdata[inst_status[t2[1][3:0]][`FU]] : rdata2[1];
+    assign fu_rdata1[2] = t1[2]!=`NULL & cb_we[inst_status[t1[2][3:0]][`FU]] ? wdata[inst_status[t1[2][3:0]][`FU]] : rdata1[2];
+    assign fu_rdata2[2] = t2[2]!=`NULL & cb_we[inst_status[t2[2][3:0]][`FU]] ? wdata[inst_status[t2[2][3:0]][`FU]] : rdata2[2];
+    assign fu_rdata1[3] = t1[3]!=`NULL & cb_we[inst_status[t1[3][3:0]][`FU]] ? wdata[inst_status[t1[3][3:0]][`FU]] : rdata1[3];
+    assign fu_rdata2[3] = t2[3]!=`NULL & cb_we[inst_status[t2[3][3:0]][`FU]] ? wdata[inst_status[t2[3][3:0]][`FU]] : rdata2[3];
+    assign fu_rdata1[4] = t1[4]!=`NULL & cb_we[inst_status[t1[4][3:0]][`FU]] ? wdata[inst_status[t1[4][3:0]][`FU]] : rdata1[4];
+    assign fu_rdata2[4] = t2[4]!=`NULL & cb_we[inst_status[t2[4][3:0]][`FU]] ? wdata[inst_status[t2[4][3:0]][`FU]] : rdata2[4];
+    assign fu_rdata1[5] = t1[5]!=`NULL & cb_we[inst_status[t1[5][3:0]][`FU]] ? wdata[inst_status[t1[5][3:0]][`FU]] : rdata1[5];
+    assign fu_rdata2[5] = t2[5]!=`NULL & cb_we[inst_status[t2[5][3:0]][`FU]] ? wdata[inst_status[t2[5][3:0]][`FU]] : rdata2[5];
+    assign fu_rdata1[6] = t1[6]!=`NULL & cb_we[inst_status[t1[6][3:0]][`FU]] ? wdata[inst_status[t1[6][3:0]][`FU]] : rdata1[6];
+    assign fu_rdata2[6] = t2[6]!=`NULL & cb_we[inst_status[t2[6][3:0]][`FU]] ? wdata[inst_status[t2[6][3:0]][`FU]] : rdata2[6];
+    assign fu_rdata1[7] = t1[7]!=`NULL & cb_we[inst_status[t1[7][3:0]][`FU]] ? wdata[inst_status[t1[7][3:0]][`FU]] : rdata1[7];
+    assign fu_rdata2[7] = t2[7]!=`NULL & cb_we[inst_status[t2[7][3:0]][`FU]] ? wdata[inst_status[t2[7][3:0]][`FU]] : rdata2[7];
+
+
     FU_ALU u0_FU(
     	.clk         (clk                   ),
         .resetn      (resetn                ),
         .ready       (fu_rdy[0]             ),
         .op          (op[0]                 ),
         .inst_status (inst_status[iptr[0]]  ),
-        .rdata1      (rdata1[0]             ),
-        .rdata2      (rdata2[0]             ),
+        .rdata1      (fu_rdata1[0]             ),
+        .rdata2      (fu_rdata2[0]             ),
         .cb_we       (cb_we[0]              ),
         .rf_we       (rf_we[0]              ),
         .wdata       (wdata[0]              )
@@ -627,8 +656,8 @@ module scoreboard(
         .ready       (fu_rdy[1]             ),
         .op          (op[1]                 ),
         .inst_status (inst_status[iptr[1]]  ),
-        .rdata1      (rdata1[1]             ),
-        .rdata2      (rdata2[1]             ),
+        .rdata1      (fu_rdata1[1]             ),
+        .rdata2      (fu_rdata2[1]             ),
         .cb_we       (cb_we[1]              ),
         .rf_we       (rf_we[1]              ),
         .wdata       (wdata[1]              )
@@ -640,8 +669,8 @@ module scoreboard(
         .ready       (fu_rdy[2]             ),
         .op          (op[2]                 ),
         .inst_status (inst_status[iptr[2]]  ),
-        .rdata1      (rdata1[2]             ),
-        .rdata2      (rdata2[2]             ),
+        .rdata1      (fu_rdata1[2]             ),
+        .rdata2      (fu_rdata2[2]             ),
         .cb_we       (cb_we[2]              ),
         .rf_we       (rf_we[2]              ),
         .wdata       (wdata[2]              ),
@@ -656,8 +685,8 @@ module scoreboard(
         //.dcache_miss     (dcache_miss       ),
         .op              (op[3]             ),
         .inst_status     (inst_status[iptr[3]]),
-        .rdata1          (rdata1[3]         ),
-        .rdata2          (rdata2[3]         ),
+        .rdata1          (fu_rdata1[3]         ),
+        .rdata2          (fu_rdata2[3]         ),
         .cb_we           (cb_we[3]          ),
         .rf_we           (rf_we[3]          ),
         .store_en        (store_en          ),
@@ -691,8 +720,8 @@ module scoreboard(
         .ready       (fu_rdy[5]       ),
         .op          (op[5]          ),
         .inst_status (inst_status[iptr[5]] ),
-        .rdata1      (rdata1[5]      ),
-        .rdata2      (rdata2[5]      ),
+        .rdata1      (fu_rdata1[5]      ),
+        .rdata2      (fu_rdata2[5]      ),
         .cb_we       (cb_we[5]       ),
         .rf_we       (rf_we[5]       ),
         .wdata       (wdata[5]       )
@@ -704,8 +733,8 @@ module scoreboard(
         .ready       (fu_rdy[6]       ),
         .op          (op[6]          ),
         .inst_status (inst_status[iptr[6]] ),
-        .rdata1      (rdata1[6]      ),
-        .rdata2      (rdata2[6]      ),
+        .rdata1      (fu_rdata1[6]      ),
+        .rdata2      (fu_rdata2[6]      ),
         .cb_we       (cb_we[6]       ),
         .rf_we       (rf_we[6]       ),
         .wdata       (wdata[6]       )
