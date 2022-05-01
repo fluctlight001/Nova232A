@@ -49,6 +49,10 @@ module FU_HILO (
     wire inst_mfhi, inst_mflo,  inst_mthi,  inst_mtlo;
     wire inst_mult, inst_multu, inst_div,   inst_divu;
 
+    reg stallreq_for_div;
+    reg stallreq_for_mul;
+    assign busy = stallreq_for_div | stallreq_for_mul;
+
     // wire hi_we, lo_we;
     wire [31:0] hi_o, lo_o;
     wire op_mul, op_div;
@@ -76,10 +80,39 @@ module FU_HILO (
         .result     (mul_result     )
     );
 
+    reg cnt;
+    reg next_cnt;
+    
+    always @ (posedge clk) begin
+        if (!resetn) begin
+           cnt <= 1'b0; 
+        end
+        else begin
+           cnt <= next_cnt; 
+        end
+    end
+
+    always @ (*) begin
+        if (!resetn) begin
+            stallreq_for_mul <= 1'b0;
+            next_cnt <= 1'b0;
+        end
+        else if((inst_mult|inst_multu)&~cnt) begin
+            stallreq_for_mul <= 1'b1;
+            next_cnt <= 1'b1;
+        end
+        else if((inst_mult|inst_multu)&cnt) begin
+            stallreq_for_mul <= 1'b0;
+            next_cnt <= 1'b0;
+        end
+        else begin
+           stallreq_for_mul <= 1'b0;
+           next_cnt <= 1'b0; 
+        end
+    end
+
     // DIV part
     wire div_ready_i;
-    reg stallreq_for_div;
-    assign busy = stallreq_for_div;
 
     reg [31:0] div_opdata1_o;
     reg [31:0] div_opdata2_o;
