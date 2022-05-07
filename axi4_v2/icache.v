@@ -48,14 +48,14 @@ module icache(
 
     icache_tag u0_tag(
         .clk    (clk        ),
-        .we     (reload     ),
+        .we     (reload&~lru[index]     ),
         .a      (index      ),
         .d      ({1'b1, tag}),
         .spo    (tag_way0   )
     );
     icache_tag u1_tag(
         .clk    (clk        ),
-        .we     (reload     ),
+        .we     (reload&lru[index]     ),
         .a      (index      ),
         .d      ({1'b1, tag}),
         .spo    (tag_way1   )
@@ -75,7 +75,7 @@ module icache(
         .en            (inst_sram_en        ),
         .addr          (inst_sram_addr      ),
         .dout          (rdata_way0          ),
-        .reload        (reload              ),
+        .reload        (reload&~lru[index]              ),
         .cacheline_new (cacheline_new       )
     );
 
@@ -84,7 +84,7 @@ module icache(
         .en            (inst_sram_en        ),
         .addr          (inst_sram_addr      ),
         .dout          (rdata_way1          ),
-        .reload        (reload              ),
+        .reload        (reload&lru[index]              ),
         .cacheline_new (cacheline_new       )
     );
 

@@ -3,8 +3,8 @@ module scoreboard(
     input wire clk,
     input wire resetn,
 
-    // input wire dcache_miss,
     output wire stallreq,
+    input wire dcache_miss,
 
     input wire inst1_valid, inst2_valid,
     input wire [`ID_TO_SB_WD-1:0] inst1, inst2,
@@ -22,9 +22,6 @@ module scoreboard(
     output wire [4:0] debug_wb_rf_wnum,
     output wire [31:0] debug_wb_rf_wdata 
 );
-    wire dcache_miss;
-    assign dcache_miss = 1'b0;
-
     wire flush;
     reg [`INST_STATE_WD-1:0] inst_status [15:0];
     reg [15:0] valid_inst, dispatch, issue, execute;
@@ -135,18 +132,22 @@ module scoreboard(
 
     assign dispatch1_ok = valid_inst[dptr] 
                         & ~dispatch[dptr]
-                        & (~busy[inst_status[dptr][`FU]] | cb_we[inst_status[dptr][`FU]])
+                        // & (~busy[inst_status[dptr][`FU]] | cb_we[inst_status[dptr][`FU]])
+                        & (~busy[inst_status[dptr][`FU]] | (cb_we[inst_status[dptr][`FU]] & inst_status[dptr][`FU]!=`AGU))
                         // & (~busy[inst_status[dptr][`FU]] | retire_en[0]&inst_status[dptr][`FU]==inst_status[raddr][`FU]&iptr[inst_status[raddr][`FU]]==raddr | retire_en[1]&inst_status[dptr][`FU]==inst_status[raddr+1'b1][`FU]&iptr[inst_status[raddr+1'b1][`FU]==raddr+1'b1])
                         // & reg_status[inst_status[dptr][`REG3]]==`NULL
-                        & !br_bus[32];// | dptr == raddr+1'b1);
+                        & !br_bus[32]// | dptr == raddr+1'b1);
+                        & !dcache_miss;
     assign dispatch2_ok = valid_inst[dptr+1'b1] 
                         & ~dispatch[dptr+1'b1] 
-                        & (~busy[inst_status[dptr+1'b1][`FU]] | cb_we[inst_status[dptr+1'b1][`FU]])
+                        // & (~busy[inst_status[dptr+1'b1][`FU]] | cb_we[inst_status[dptr+1'b1][`FU]])
+                        & (~busy[inst_status[dptr+1'b1][`FU]] | cb_we[inst_status[dptr+1'b1][`FU]] & inst_status[dptr+1'b1][`FU]!=`AGU)
                         // & (~busy[inst_status[dptr+1'b1][`FU]] | retire_en[0]&inst_status[dptr+1'b1][`FU]==inst_status[raddr][`FU]&iptr[inst_status[raddr][`FU]]==raddr | retire_en[1]&inst_status[dptr+1'b1][`FU]==inst_status[raddr+1'b1][`FU]&iptr[inst_status[raddr+1'b1][`FU]==raddr+1'b1])
                         & inst_status[dptr][`FU]!=inst_status[dptr+1'b1][`FU] 
                         // & reg_status[inst_status[dptr+1'b1][`REG3]]==`NULL //& (inst_status[dptr+1'b1][`REG3]!=inst_status[dptr][`REG3] | inst_status[dptr+1'b1][`REG3]==0) 
                         & !br_bus[32] 
-                        & dispatch1_ok;
+                        & dispatch1_ok
+                        & !dcache_miss;
                         
     always @ (posedge clk) begin
         if (!resetn) begin
@@ -190,7 +191,7 @@ module scoreboard(
             issue <= 16'b0;
             execute <= 16'b0;
         end
-        else if (br_bus[32]) begin
+        else if (br_bus[32] & ~(dcache_miss&(st_e_r[raddr]|b_s))) begin
             inst_status[ 0] <= `INST_STATE_WD'b0;
             inst_status[ 1] <= `INST_STATE_WD'b0;
             inst_status[ 2] <= `INST_STATE_WD'b0;
@@ -301,7 +302,7 @@ module scoreboard(
             iptr[6] <= 0;
             iptr[7] <= 0;
         end
-        else if (br_bus[32]) begin
+        else if (br_bus[32] & ~(dcache_miss&(st_e_r[raddr]|b_s))) begin
             {busy[0],op[0],r[0],r1[0],r2[0],t1[0],t2[0]} <= {1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
             {busy[1],op[1],r[1],r1[1],r2[1],t1[1],t2[1]} <= {1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
             {busy[2],op[2],r[2],r1[2],r2[2],t1[2],t2[2]} <= {1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
@@ -360,7 +361,7 @@ module scoreboard(
             if (cb_we[0]) {iptr[0],busy[0],op[0],r[0],r1[0],r2[0],t1[0],t2[0]} <= {4'b0,1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
             if (cb_we[1]) {iptr[1],busy[1],op[1],r[1],r1[1],r2[1],t1[1],t2[1]} <= {4'b0,1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
             if (cb_we[2]) {iptr[2],busy[2],op[2],r[2],r1[2],r2[2],t1[2],t2[2]} <= {4'b0,1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
-            if (cb_we[3]) {iptr[3],busy[3],op[3],r[3],r1[3],r2[3],t1[3],t2[3]} <= {4'b0,1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
+            if ((retire_en[0]&raddr==iptr[3])|(retire_en[1]&raddr+1'b1==iptr[3])) {iptr[3],busy[3],op[3],r[3],r1[3],r2[3],t1[3],t2[3]} <= {4'b0,1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
             if (cb_we[4]) {iptr[4],busy[4],op[4],r[4],r1[4],r2[4],t1[4],t2[4]} <= {4'b0,1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
             if (cb_we[5]) {iptr[5],busy[5],op[5],r[5],r1[5],r2[5],t1[5],t2[5]} <= {4'b0,1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
             if (cb_we[6]) {iptr[6],busy[6],op[6],r[6],r1[6],r2[6],t1[6],t2[6]} <= {4'b0,1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
@@ -614,7 +615,7 @@ module scoreboard(
     assign debug_wb_pc = ~debug_way ? (retire_en[0] ? inst_status[raddr][`PC] : 32'b0) : (retire_en[1] ? inst_status[raddr+1'b1][`PC] : 32'b0);
     assign debug_wb_rf_wen = ~debug_way ? {4{rf_we_o[0]}} : {4{rf_we_o[1]}};
     assign debug_wb_rf_wnum = ~debug_way ? rf_waddr[0] : rf_waddr[1];
-    assign debug_wb_rf_wdata = ~debug_way ? rf_wdata[0][31:0] : rf_wdata[1][31:0];
+    assign debug_wb_rf_wdata = ~debug_way ? cb[raddr] : cb[raddr+1'b1];
 
     regfile u_regfile(
     	.clk     (clk     ),
@@ -702,6 +703,7 @@ module scoreboard(
     FU_ALU u0_FU(
     	.clk         (clk                   ),
         .resetn      (resetn                ),
+        .flush       (1'b0),
         .ready       (fu_rdy[0]             ),
         .op          (op[0]                 ),
         .inst_status (inst_status[iptr[0]]  ),
@@ -715,6 +717,7 @@ module scoreboard(
     FU_ALU u1_FU(
     	.clk         (clk                   ),
         .resetn      (resetn                ),
+        .flush       (1'b0),
         .ready       (fu_rdy[1]             ),
         .op          (op[1]                 ),
         .inst_status (inst_status[iptr[1]]  ),
@@ -744,7 +747,7 @@ module scoreboard(
     	.clk             (clk               ),
         .resetn          (resetn            ),
         .ready           (fu_rdy[3]         ),
-        //.dcache_miss     (dcache_miss       ),
+        .dcache_miss     (dcache_miss       ),
         .op              (op[3]             ),
         .inst_status     (inst_status[iptr[3]]),
         .rdata1          (fu_rdata1[3]         ),
@@ -779,6 +782,7 @@ module scoreboard(
     FU_ALU u5_FU(
     	.clk         (clk         ),
         .resetn      (resetn      ),
+        .flush       (1'b0),
         .ready       (fu_rdy[5]       ),
         .op          (op[5]          ),
         .inst_status (inst_status[iptr[5]] ),
@@ -792,6 +796,7 @@ module scoreboard(
     FU_ALU u6_FU(
     	.clk         (clk         ),
         .resetn      (resetn      ),
+        .flush       (1'b0),
         .ready       (fu_rdy[6]       ),
         .op          (op[6]          ),
         .inst_status (inst_status[iptr[6]] ),
@@ -836,7 +841,7 @@ module scoreboard(
             if (cb_we[4]) {st_e_r[iptr[4]], st_sel_r[iptr[4]], br_e_r[iptr[4]], rf_we_r[iptr[4]], cb[iptr[4]], cb_extra[iptr[4]]} <= {1'b0, 4'b0, 1'b0, rf_we[4], wdata[4], extra_wdata[4]};
             if (cb_we[5]) {st_e_r[iptr[5]], st_sel_r[iptr[5]], br_e_r[iptr[5]], rf_we_r[iptr[5]], cb[iptr[5]], cb_extra[iptr[5]]} <= {1'b0, 4'b0, 1'b0, rf_we[5], wdata[5], 32'b0};
             if (cb_we[6]) {st_e_r[iptr[6]], st_sel_r[iptr[6]], br_e_r[iptr[6]], rf_we_r[iptr[6]], cb[iptr[6]], cb_extra[iptr[6]]} <= {1'b0, 4'b0, 1'b0, rf_we[6], wdata[6], 32'b0};
-            if (br_bus[32]) begin
+            if (br_bus[32] & ~(dcache_miss&(st_e_r[raddr]|b_s))) begin
                 br_e_r <= 16'b0;
                 st_e_r <= 16'b0;
                 // st_e_r[raddr+1'b1] <= st_e_r[raddr+1'b1];

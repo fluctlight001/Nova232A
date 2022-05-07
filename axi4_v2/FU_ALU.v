@@ -2,6 +2,7 @@
 module FU_ALU(
     input wire clk,
     input wire resetn,
+    input wire flush,
 
     input wire ready,
 
@@ -18,7 +19,7 @@ module FU_ALU(
     reg [`INST_STATE_WD-1:0] r_inst_status;
 
     always @ (posedge clk) begin
-        if (!resetn) begin
+        if (!resetn | flush) begin
             r_op <= 12'b0;
             r_rdata1 <= 32'b0;
             r_rdata2 <= 32'b0;

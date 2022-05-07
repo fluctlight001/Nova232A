@@ -4,7 +4,7 @@ module FU_AGU(
     input wire resetn,
 
     input wire ready,
-    // input wire dcache_miss,
+    input wire dcache_miss,
 
     input wire [11:0] op,
     input wire [`INST_STATE_WD-1:0] inst_status,
@@ -31,9 +31,6 @@ module FU_AGU(
     reg [11:0] r_op;
     reg [31:0] r_rdata1, r_rdata2;
     reg [`INST_STATE_WD-1:0] r_inst_status_ex;
-
-    wire dcache_miss;
-    assign dcache_miss = 1'b0;
 
     always @ (posedge clk) begin
         if (!resetn) begin

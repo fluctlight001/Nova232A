@@ -3,6 +3,9 @@ module mycpu_core(
     input wire clk,
     input wire resetn,
     input wire [5:0] int,
+    input wire stallreq_icache,
+    input wire stallreq_dcache,
+    input wire stallreq_uncache,
 
     output wire inst_sram_en,
     output wire [3:0] inst_sram_wen,
@@ -28,7 +31,7 @@ module mycpu_core(
     wire [`ID_TO_SB_WD-1:0] inst1_bus, inst2_bus;
     wire [31:0] inst_sram_addr_v, data_sram_addr_v;
     wire stallreq;
-    assign stall = stallreq;
+    assign stall = stallreq | stallreq_icache | stallreq_dcache | stallreq_uncache;
 
     mmu u0_mmu(
     	.addr_i (inst_sram_addr_v ),
@@ -70,6 +73,7 @@ module mycpu_core(
     	.clk               (clk               ),
         .resetn            (resetn            ),
         .stallreq          (stallreq          ),
+        .dcache_miss       (stallreq_dcache | stallreq_uncache),
         .inst1_valid       (inst1_valid       ),
         .inst2_valid       (inst2_valid       ),
         .inst1             (inst1_bus         ),

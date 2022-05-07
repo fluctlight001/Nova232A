@@ -78,6 +78,9 @@ module axi_ctrl(
     reg [3:0] dcache_offset;
     reg [3:0] dcache_offset_w;
 
+    reg ird_req_r, drd_req_r, unrd_req_r;
+    reg dwr_req_r, unwr_req_r;
+
     always @ (posedge clk) begin
         if (!resetn) begin
             arid <= 4'b0000;
@@ -94,6 +97,12 @@ module axi_ctrl(
 
             stage <= `STAGE_WIDTH'b1;
 
+            ird_req_r <= 1'b0;
+            drd_req_r <= 1'b0;
+            unrd_req_r <= 1'b0;
+            dwr_req_r <= 1'b0;
+            unwr_req_r <= 1'b0;
+
             i_reload <= 1'b0;
             d_reload <= 1'b0;
             un_reload <= 1'b0;
@@ -104,18 +113,30 @@ module axi_ctrl(
         else begin
             case (1'b1)
                 stage[0]:begin
+                    i_reload <= 1'b0;
+                    d_reload <= 1'b0;
+                    un_reload <= 1'b0;
+                    
+                    ird_req_r <= ird_req;
+                    drd_req_r <= drd_req;
+                    unrd_req_r <= unrd_req;
+                    dwr_req_r <= dwr_req;
+                    unwr_req_r <= unwr_req;
                     if (dwr_req|unwr_req) begin
                         stage <= stage << 1;
                     end
-                    else if (ird_req|drd_req) begin
+                    else if (ird_req) begin
                         stage <= stage << 2;
+                    end
+                    else if (drd_req|unrd_req) begin
+                        stage <= stage << 5; 
                     end
                 end
                 stage[1]:begin
-                    if (ird_req) begin
+                    if (ird_req_r) begin
                         stage <= stage << 1; 
                     end
-                    else if (drd_req|unrd_req) begin
+                    else if (drd_req_r|unrd_req_r) begin
                         stage <= stage << 4;
                     end
                     else begin
@@ -123,7 +144,7 @@ module axi_ctrl(
                     end
                 end
                 stage[2]:begin
-                    if (ird_req) begin
+                    if (ird_req_r) begin
                         arid <= 4'b0;
                         araddr <= ird_addr;
                         arlen <= 4'hf;
@@ -159,7 +180,7 @@ module axi_ctrl(
                     end
                 end
                 stage[5]:begin
-                    if (drd_req) begin
+                    if (drd_req_r) begin
                         arid <= 4'b1;
                         araddr <= drd_addr;
                         arlen <= 4'h7;
@@ -168,7 +189,7 @@ module axi_ctrl(
                         
                         stage <= stage << 1;
                     end
-                    else if (unrd_req) begin
+                    else if (unrd_req_r) begin
                         arid <= 4'd2;
                         araddr <= unrd_addr;
                         arlen <= 4'b0;
@@ -221,13 +242,13 @@ module axi_ctrl(
                     end
                 end
                 stage[11]:begin
-                    if (ird_req) begin
+                    if (ird_req_r) begin
                         i_reload <= 1'b1;
                     end
-                    if (drd_req) begin
+                    if (drd_req_r) begin
                         d_reload <= 1'b1;
                     end
-                    if (unrd_req) begin
+                    if (unrd_req_r|unwr_req_r) begin
                         un_reload <= 1'b1;
                     end
                     stage <= 0;
@@ -236,7 +257,7 @@ module axi_ctrl(
                     stage <= 1;
                     i_reload <= 1'b0;
                     d_reload <= 1'b0;
-
+                    un_reload <= 1'b0;
                 end
             endcase
         end
@@ -263,12 +284,25 @@ module axi_ctrl(
             bready <= 1'b0;
 
             stage_w <= `STAGE_WIDTH'b1;
+            dcache_offset_w <= 4'b0;
         end
         else begin
             case (1'b1) 
                 stage_w[0]:begin
                     if (stage[1]) begin
-                        if (unwr_req) begin
+                        if (dwr_req_r) begin
+                            awid <= 4'b1;
+                            awaddr <= dwr_addr;
+                            awlen <= 4'h7;
+                            awsize <= 3'b010;
+                            awvalid <= 1'b1;
+                            wstrb <= 4'b1111;
+                            wlast <= 1'b0;
+                            bready <= 1'b1;
+                            dcache_offset_w <= 4'b0;
+                            stage_w <= stage_w << 1;
+                        end
+                        else if (unwr_req_r) begin
                             awid <= 4'd2;
                             awaddr <= unwr_addr;
                             awlen <= 4'b0;
@@ -295,6 +329,35 @@ module axi_ctrl(
                             bready <= 1'b1;
                             stage_w <= stage_w << 4;
                         end
+                    end
+                end
+                stage_w[1]:begin
+                    if (awready) begin
+                        awvalid <= 1'b0;
+                        awaddr <= 32'b0;
+                    end
+                    if (wready) begin
+                        wdata <= dcacheline_old[dcache_offset_w*32+:32];
+                        wvalid <= 1'b1;
+                        wlast <= dcache_offset_w==4'b0111 ? 1'b1 : 1'b0;
+                        dcache_offset_w <= dcache_offset_w + 1'b1;
+                        if (dcache_offset_w == 4'b0111) begin
+                            stage_w <= stage_w << 1;
+                        end
+                    end
+                end
+                stage_w[2]:begin
+                    if (wready) begin
+                        wdata <= 32'b0;
+                        wvalid <= 1'b0;    
+                        wlast <= 1'b0;
+                        stage_w <= stage_w << 1;
+                    end
+                end
+                stage_w[3]:begin
+                    if (bvalid) begin
+                        bready <= 1'b0;
+                        stage_w <= {1'b0,1'b1,{10{1'b0}}};
                     end
                 end
                 stage_w[4]:begin
