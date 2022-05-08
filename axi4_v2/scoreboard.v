@@ -133,7 +133,9 @@ module scoreboard(
     assign dispatch1_ok = valid_inst[dptr] 
                         & ~dispatch[dptr]
                         // & (~busy[inst_status[dptr][`FU]] | cb_we[inst_status[dptr][`FU]])
-                        & (~busy[inst_status[dptr][`FU]] | (cb_we[inst_status[dptr][`FU]] & inst_status[dptr][`FU]!=`AGU))
+                        // & (~busy[inst_status[dptr][`FU]] | (cb_we[inst_status[dptr][`FU]] & rf_we[inst_status[dptr][`FU]]))
+                        // & (~busy[inst_status[dptr][`FU]] | (cb_we[inst_status[dptr][`FU]] & (inst_status[dptr][`FU]!=`AGU | rf_we[3])))
+                        & (~busy[inst_status[dptr][`FU]] | (cb_we[inst_status[dptr][`FU]] & (inst_status[dptr][`FU]!=`AGU | rf_we[3])) | ((inst_status[dptr][`FU]==`AGU & retire_en[0] & inst_status[raddr][`FU]==`AGU & ~rf_we_r[raddr] | inst_status[dptr][`FU]==`AGU & retire_en[1] & inst_status[raddr+1'b1][`FU]==`AGU & ~rf_we_r[raddr+1'b1])))
                         // & (~busy[inst_status[dptr][`FU]] | retire_en[0]&inst_status[dptr][`FU]==inst_status[raddr][`FU]&iptr[inst_status[raddr][`FU]]==raddr | retire_en[1]&inst_status[dptr][`FU]==inst_status[raddr+1'b1][`FU]&iptr[inst_status[raddr+1'b1][`FU]==raddr+1'b1])
                         // & reg_status[inst_status[dptr][`REG3]]==`NULL
                         & !br_bus[32]// | dptr == raddr+1'b1);
@@ -141,7 +143,9 @@ module scoreboard(
     assign dispatch2_ok = valid_inst[dptr+1'b1] 
                         & ~dispatch[dptr+1'b1] 
                         // & (~busy[inst_status[dptr+1'b1][`FU]] | cb_we[inst_status[dptr+1'b1][`FU]])
-                        & (~busy[inst_status[dptr+1'b1][`FU]] | cb_we[inst_status[dptr+1'b1][`FU]] & inst_status[dptr+1'b1][`FU]!=`AGU)
+                        // & (~busy[inst_status[dptr+1'b1][`FU]] | (cb_we[inst_status[dptr+1'b1][`FU]] & rf_we[inst_status[dptr+1'b1][`FU]]))
+                        // & (~busy[inst_status[dptr+1'b1][`FU]] | (cb_we[inst_status[dptr+1'b1][`FU]] & (inst_status[dptr+1'b1][`FU]!=`AGU | rf_we[3])))
+                        & (~busy[inst_status[dptr+1'b1][`FU]] | (cb_we[inst_status[dptr+1'b1][`FU]] & (inst_status[dptr+1'b1][`FU]!=`AGU | rf_we[3])) | ((inst_status[dptr+1'b1][`FU]==`AGU & retire_en[0] & inst_status[raddr][`FU]==`AGU & ~rf_we_r[raddr] |inst_status[dptr+1'b1][`FU]==`AGU &  retire_en[1] & inst_status[raddr+1'b1][`FU]==`AGU & ~rf_we_r[raddr+1'b1])))
                         // & (~busy[inst_status[dptr+1'b1][`FU]] | retire_en[0]&inst_status[dptr+1'b1][`FU]==inst_status[raddr][`FU]&iptr[inst_status[raddr][`FU]]==raddr | retire_en[1]&inst_status[dptr+1'b1][`FU]==inst_status[raddr+1'b1][`FU]&iptr[inst_status[raddr+1'b1][`FU]==raddr+1'b1])
                         & inst_status[dptr][`FU]!=inst_status[dptr+1'b1][`FU] 
                         // & reg_status[inst_status[dptr+1'b1][`REG3]]==`NULL //& (inst_status[dptr+1'b1][`REG3]!=inst_status[dptr][`REG3] | inst_status[dptr+1'b1][`REG3]==0) 
@@ -361,7 +365,7 @@ module scoreboard(
             if (cb_we[0]) {iptr[0],busy[0],op[0],r[0],r1[0],r2[0],t1[0],t2[0]} <= {4'b0,1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
             if (cb_we[1]) {iptr[1],busy[1],op[1],r[1],r1[1],r2[1],t1[1],t2[1]} <= {4'b0,1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
             if (cb_we[2]) {iptr[2],busy[2],op[2],r[2],r1[2],r2[2],t1[2],t2[2]} <= {4'b0,1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
-            if ((retire_en[0]&raddr==iptr[3])|(retire_en[1]&raddr+1'b1==iptr[3])) {iptr[3],busy[3],op[3],r[3],r1[3],r2[3],t1[3],t2[3]} <= {4'b0,1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
+            if ((retire_en[0]&raddr==iptr[3]&~rf_we_r[raddr])|(retire_en[1]&raddr+1'b1==iptr[3]&~rf_we_r[raddr+1'b1])|(cb_we[3]&rf_we[3])) {iptr[3],busy[3],op[3],r[3],r1[3],r2[3],t1[3],t2[3]} <= {4'b0,1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
             if (cb_we[4]) {iptr[4],busy[4],op[4],r[4],r1[4],r2[4],t1[4],t2[4]} <= {4'b0,1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
             if (cb_we[5]) {iptr[5],busy[5],op[5],r[5],r1[5],r2[5],t1[5],t2[5]} <= {4'b0,1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
             if (cb_we[6]) {iptr[6],busy[6],op[6],r[6],r1[6],r2[6],t1[6],t2[6]} <= {4'b0,1'b0,12'b0,6'b0,6'b111111,6'b111111,`NULL,`NULL};
@@ -602,8 +606,8 @@ module scoreboard(
     assign rf_wdata[1] = retire_en[1] ? {cb_extra[raddr+1'b1], cb[raddr+1'b1]} : 64'b0;
 
     reg debug_way;
-    // always @ (posedge clk or negedge clk) begin
-    always @ (posedge clk) begin
+    always @ (posedge clk or negedge clk) begin
+    // always @ (posedge clk) begin
         if (!resetn) begin
             debug_way <= 1'b0;
         end
