@@ -139,7 +139,7 @@ module scoreboard(
                         // & (~busy[inst_status[dptr][`FU]] | retire_en[0]&inst_status[dptr][`FU]==inst_status[raddr][`FU]&iptr[inst_status[raddr][`FU]]==raddr | retire_en[1]&inst_status[dptr][`FU]==inst_status[raddr+1'b1][`FU]&iptr[inst_status[raddr+1'b1][`FU]==raddr+1'b1])
                         // & reg_status[inst_status[dptr][`REG3]]==`NULL
                         & !br_bus[32]// | dptr == raddr+1'b1);
-                        & !dcache_miss;
+                        & (!dcache_miss | inst_status[dptr][`FU]!=`AGU);
     assign dispatch2_ok = valid_inst[dptr+1'b1] 
                         & ~dispatch[dptr+1'b1] 
                         // & (~busy[inst_status[dptr+1'b1][`FU]] | cb_we[inst_status[dptr+1'b1][`FU]])
@@ -151,7 +151,7 @@ module scoreboard(
                         // & reg_status[inst_status[dptr+1'b1][`REG3]]==`NULL //& (inst_status[dptr+1'b1][`REG3]!=inst_status[dptr][`REG3] | inst_status[dptr+1'b1][`REG3]==0) 
                         & !br_bus[32] 
                         & dispatch1_ok
-                        & !dcache_miss;
+                        & (!dcache_miss | inst_status[dptr+1'b1][`FU]!=`AGU);
                         
     always @ (posedge clk) begin
         if (!resetn) begin
@@ -606,8 +606,8 @@ module scoreboard(
     assign rf_wdata[1] = retire_en[1] ? {cb_extra[raddr+1'b1], cb[raddr+1'b1]} : 64'b0;
 
     reg debug_way;
-    always @ (posedge clk or negedge clk) begin
-    // always @ (posedge clk) begin
+    always @ (posedge clk or negedge clk) begin  // 仿真
+    // always @ (posedge clk) begin  // 上板
         if (!resetn) begin
             debug_way <= 1'b0;
         end
