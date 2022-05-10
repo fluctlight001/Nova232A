@@ -134,8 +134,8 @@ module scoreboard(
                         & ~dispatch[dptr]
                         // & (~busy[inst_status[dptr][`FU]] | cb_we[inst_status[dptr][`FU]])
                         // & (~busy[inst_status[dptr][`FU]] | (cb_we[inst_status[dptr][`FU]] & rf_we[inst_status[dptr][`FU]]))
-                        & (~busy[inst_status[dptr][`FU]] | (cb_we[inst_status[dptr][`FU]] & (inst_status[dptr][`FU]!=`AGU | rf_we[3])))
-                        // & (~busy[inst_status[dptr][`FU]] | (cb_we[inst_status[dptr][`FU]] & (inst_status[dptr][`FU]!=`AGU | rf_we[3])) | ((inst_status[dptr][`FU]==`AGU & retire_en[0] & inst_status[raddr][`FU]==`AGU & ~rf_we_r[raddr] | inst_status[dptr][`FU]==`AGU & retire_en[1] & inst_status[raddr+1'b1][`FU]==`AGU & ~rf_we_r[raddr+1'b1])))
+                        // & (~busy[inst_status[dptr][`FU]] | (cb_we[inst_status[dptr][`FU]] & (inst_status[dptr][`FU]!=`AGU | rf_we[3])))
+                        & (~busy[inst_status[dptr][`FU]] | (cb_we[inst_status[dptr][`FU]] & (inst_status[dptr][`FU]!=`AGU | rf_we[3])) | ((inst_status[dptr][`FU]==`AGU & retire_en[0] & inst_status[raddr][`FU]==`AGU & ~rf_we_r[raddr] | inst_status[dptr][`FU]==`AGU & retire_en[1] & inst_status[raddr+1'b1][`FU]==`AGU & ~rf_we_r[raddr+1'b1])))
                         // & (~busy[inst_status[dptr][`FU]] | retire_en[0]&inst_status[dptr][`FU]==inst_status[raddr][`FU]&iptr[inst_status[raddr][`FU]]==raddr | retire_en[1]&inst_status[dptr][`FU]==inst_status[raddr+1'b1][`FU]&iptr[inst_status[raddr+1'b1][`FU]==raddr+1'b1])
                         // & reg_status[inst_status[dptr][`REG3]]==`NULL
                         & !br_bus[32]// | dptr == raddr+1'b1);
@@ -144,8 +144,8 @@ module scoreboard(
                         & ~dispatch[dptr+1'b1] 
                         // & (~busy[inst_status[dptr+1'b1][`FU]] | cb_we[inst_status[dptr+1'b1][`FU]])
                         // & (~busy[inst_status[dptr+1'b1][`FU]] | (cb_we[inst_status[dptr+1'b1][`FU]] & rf_we[inst_status[dptr+1'b1][`FU]]))
-                        & (~busy[inst_status[dptr+1'b1][`FU]] | (cb_we[inst_status[dptr+1'b1][`FU]] & (inst_status[dptr+1'b1][`FU]!=`AGU | rf_we[3])))
-                        // & (~busy[inst_status[dptr+1'b1][`FU]] | (cb_we[inst_status[dptr+1'b1][`FU]] & (inst_status[dptr+1'b1][`FU]!=`AGU | rf_we[3])) | ((inst_status[dptr+1'b1][`FU]==`AGU & retire_en[0] & inst_status[raddr][`FU]==`AGU & ~rf_we_r[raddr] |inst_status[dptr+1'b1][`FU]==`AGU &  retire_en[1] & inst_status[raddr+1'b1][`FU]==`AGU & ~rf_we_r[raddr+1'b1])))
+                        // & (~busy[inst_status[dptr+1'b1][`FU]] | (cb_we[inst_status[dptr+1'b1][`FU]] & (inst_status[dptr+1'b1][`FU]!=`AGU | rf_we[3])))
+                        & (~busy[inst_status[dptr+1'b1][`FU]] | (cb_we[inst_status[dptr+1'b1][`FU]] & (inst_status[dptr+1'b1][`FU]!=`AGU | rf_we[3])) | ((inst_status[dptr+1'b1][`FU]==`AGU & retire_en[0] & inst_status[raddr][`FU]==`AGU & ~rf_we_r[raddr] |inst_status[dptr+1'b1][`FU]==`AGU &  retire_en[1] & inst_status[raddr+1'b1][`FU]==`AGU & ~rf_we_r[raddr+1'b1])))
                         // & (~busy[inst_status[dptr+1'b1][`FU]] | retire_en[0]&inst_status[dptr+1'b1][`FU]==inst_status[raddr][`FU]&iptr[inst_status[raddr][`FU]]==raddr | retire_en[1]&inst_status[dptr+1'b1][`FU]==inst_status[raddr+1'b1][`FU]&iptr[inst_status[raddr+1'b1][`FU]==raddr+1'b1])
                         & inst_status[dptr][`FU]!=inst_status[dptr+1'b1][`FU] 
                         // & reg_status[inst_status[dptr+1'b1][`REG3]]==`NULL //& (inst_status[dptr+1'b1][`REG3]!=inst_status[dptr][`REG3] | inst_status[dptr+1'b1][`REG3]==0) 
@@ -606,8 +606,8 @@ module scoreboard(
     assign rf_wdata[1] = retire_en[1] ? {cb_extra[raddr+1'b1], cb[raddr+1'b1]} : 64'b0;
 
     reg debug_way;
-    always @ (posedge clk or negedge clk) begin  // 仿真
-    // always @ (posedge clk) begin  // 上板
+    // always @ (posedge clk or negedge clk) begin  // 仿真
+    always @ (posedge clk) begin  // 上板
         if (!resetn) begin
             debug_way <= 1'b0;
         end
