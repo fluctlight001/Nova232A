@@ -3,12 +3,16 @@ module ID (
     input wire clk,
     input wire resetn,
 
-    input wire [`BR_WD-1:0] br_bus,
     input wire stall,
-    
+    input wire [`BR_WD-1:0] br_bus,
+    input wire [`BR_WD-1:0] bp_bus,
+    input wire next_inst_invalid,    
+    output wire [31:0] current_pc1,
+    output wire [31:0] current_pc2,
+    // IF
     input wire [31:0] pc,
     input wire [63:0] inst_sram_rdata,
-    
+    // scoreboard
     output wire inst1_valid,
     output wire [`ID_TO_SB_WD-1:0] inst1,
     output wire inst2_valid,
@@ -18,6 +22,10 @@ module ID (
     wire br_e;
     wire [31:0] br_addr;
     assign {br_e, br_addr} = br_bus;
+
+    wire bp_e;
+    wire [31:0] bp_addr;
+    assign {bp_e, bp_addr} = bp_bus;
 
     reg [31:0] easy_pc;
     reg [31:0] sram_pc, pc_r;
@@ -31,7 +39,10 @@ module ID (
             easy_pc <= 32'hbfc0_0000;
         end
         else if (br_e) begin
-            easy_pc <= br_bus;
+            easy_pc <= br_addr;
+        end
+        else if (bp_e & ~stall) begin
+            easy_pc <= bp_addr;
         end
         else if (inst1_valid&inst2_valid) begin
             easy_pc <= easy_pc + 32'd8;
@@ -42,7 +53,7 @@ module ID (
     end
 
     always @ (posedge clk) begin
-        if (!resetn | br_e) begin
+        if (!resetn | br_e | bp_e) begin
             sram_pc <= 32'b0;
         end
         else if (!stall) begin
@@ -107,7 +118,8 @@ module ID (
     );
     
     assign inst1_valid = dcd1_valid & easy_match & ~easy_pc[2];
-    assign inst2_valid = dcd2_valid & easy_match;
+    assign inst2_valid = dcd2_valid & easy_match & ~next_inst_invalid;
 
-
+    assign current_pc1 = inst1_valid ? {pc_r[31:3], 3'b000} : 32'b0;
+    assign current_pc2 = inst2_valid ? {pc_r[31:3], 3'b100} : 32'b0;
 endmodule

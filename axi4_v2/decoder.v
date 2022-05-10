@@ -330,7 +330,7 @@ module decoder
                         | inst_mfhi | inst_mflo | inst_mthi | inst_mtlo 
                         | inst_lb | inst_lbu | inst_lh | inst_lhu 
                         | inst_lw | inst_sb | inst_sh | inst_sw 
-                        // | inst_break | inst_syscall | inst_eret 
+                        | inst_break | inst_syscall | inst_eret 
                         | inst_mfc0 | inst_mtc0
                         );
     

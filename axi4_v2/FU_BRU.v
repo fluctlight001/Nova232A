@@ -8,6 +8,7 @@ module FU_BRU(
     input wire [11:0] op,
     input wire [`INST_STATE_WD-1:0] inst_status,
     input wire [31:0] rdata1, rdata2,
+    input wire [31:0] pc_plus_8,
 
     output wire cb_we,
     output wire rf_we,
@@ -39,6 +40,9 @@ module FU_BRU(
             r_inst_status <= `INST_STATE_WD'b0;
         end
     end
+
+    wire real_br_e;
+    wire [31:0] real_br_addr;
     wire [31:0] br_addr;
     wire rs_eq_rt;
     wire rs_ge_z;
@@ -63,31 +67,36 @@ module FU_BRU(
     assign rs_le_z  = (r_rdata1[31] == 1'b1 || r_rdata1 == 32'b0);
     assign rs_lt_z  = (r_rdata1[31]);
 
-    assign br_e = inst_beq & rs_eq_rt
-                | inst_bne & ~rs_eq_rt
-                | inst_bgez & rs_ge_z
-                | inst_bgtz & rs_gt_z
-                | inst_blez & rs_le_z
-                | inst_bltz & rs_lt_z
-                | inst_bltzal & rs_lt_z
-                | inst_bgezal & rs_ge_z
-                | inst_j
-                | inst_jr
-                | inst_jal
-                | inst_jalr;
+    assign real_br_e = inst_beq & rs_eq_rt
+                    | inst_bne & ~rs_eq_rt
+                    | inst_bgez & rs_ge_z
+                    | inst_bgtz & rs_gt_z
+                    | inst_blez & rs_le_z
+                    | inst_bltz & rs_lt_z
+                    | inst_bltzal & rs_lt_z
+                    | inst_bgezal & rs_ge_z
+                    | inst_j
+                    | inst_jr
+                    | inst_jal
+                    | inst_jalr;
 
-    assign br_addr  = inst_beq   ? (pc_plus_4 + r_inst_status[`IMM]) 
-                    : inst_bne   ? (pc_plus_4 + r_inst_status[`IMM])
-                    : inst_bgez  ? (pc_plus_4 + r_inst_status[`IMM])
-                    : inst_bgtz  ? (pc_plus_4 + r_inst_status[`IMM])
-                    : inst_blez  ? (pc_plus_4 + r_inst_status[`IMM])
-                    : inst_bltz  ? (pc_plus_4 + r_inst_status[`IMM])
-                    : inst_bltzal? (pc_plus_4 + r_inst_status[`IMM])
-                    : inst_bgezal? (pc_plus_4 + r_inst_status[`IMM])
-                    : inst_j     ? r_inst_status[`IMM]
-                    : inst_jr    ? r_rdata1 
-                    : inst_jal   ? r_inst_status[`IMM]
-                    : inst_jalr  ? r_rdata1 : 32'b0;
+    assign real_br_addr  = inst_beq   ? (pc_plus_4 + r_inst_status[`IMM]) 
+                        : inst_bne   ? (pc_plus_4 + r_inst_status[`IMM])
+                        : inst_bgez  ? (pc_plus_4 + r_inst_status[`IMM])
+                        : inst_bgtz  ? (pc_plus_4 + r_inst_status[`IMM])
+                        : inst_blez  ? (pc_plus_4 + r_inst_status[`IMM])
+                        : inst_bltz  ? (pc_plus_4 + r_inst_status[`IMM])
+                        : inst_bltzal? (pc_plus_4 + r_inst_status[`IMM])
+                        : inst_bgezal? (pc_plus_4 + r_inst_status[`IMM])
+                        : inst_j     ? r_inst_status[`IMM]
+                        : inst_jr    ? r_rdata1 
+                        : inst_jal   ? r_inst_status[`IMM]
+                        : inst_jalr  ? r_rdata1 : 32'b0;
+    
+    assign br_e = real_br_e ? pc_plus_8 == real_br_addr ? 1'b0 : 1'b1
+                            : pc_plus_8 == pc_plus_4 + 4'd4 ? 1'b0 : cb_we;
+    assign br_addr = real_br_e  ? pc_plus_8 == real_br_addr ? 32'b0 : real_br_addr
+                                : pc_plus_8 == pc_plus_4 + 4'd4 ? 32'b0 : pc_plus_4 + 4'd4;
 
     assign cb_we = |r_op;
     assign rf_we = r_inst_status[`WE];

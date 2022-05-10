@@ -10,6 +10,7 @@ module scoreboard(
     input wire [`ID_TO_SB_WD-1:0] inst1, inst2,
 
     output wire [`BR_WD-1:0] br_bus,
+    output wire [31:0] delayslot_pc,
 
     output wire data_sram_en,
     output wire [3:0] data_sram_wen,
@@ -85,7 +86,8 @@ module scoreboard(
         end
     end
 
-    assign wptr_next = inst1_valid ? wptr + 2 : wptr + 1;
+    assign wptr_next = inst1_valid & inst2_valid ? wptr + 2 
+                    : inst1_valid | inst2_valid ? wptr + 1 : wptr;
     always @ (posedge clk) begin
         if (!resetn) begin
             wptr <= 0;
@@ -93,10 +95,10 @@ module scoreboard(
         else if (br_bus[32]) begin
             wptr <= rptr + 2;
         end
-        else if (!full & !br_bus[32] & inst1_valid) begin
+        else if (!full & !br_bus[32] & inst1_valid & inst2_valid) begin
             wptr <= wptr + 2;
         end
-        else if (!full & !br_bus[32] & inst2_valid) begin
+        else if (!full & !br_bus[32] & (inst1_valid | inst2_valid)) begin
             wptr <= wptr + 1;
         end
     end
@@ -218,7 +220,7 @@ module scoreboard(
             execute <= 16'b0;
         end
         else begin
-            if (!full & !br_bus[32] & inst1_valid) begin
+            if (!full & !br_bus[32] & inst1_valid & inst2_valid) begin
                 valid_inst[waddr] <= 1'b1;
                 dispatch[waddr] <= 1'b0;
                 issue[waddr] <= 1'b0;
@@ -229,6 +231,13 @@ module scoreboard(
                 issue[waddr+1'b1] <= 1'b0;
                 execute[waddr+1'b1] <= 1'b0;
                 inst_status[waddr+1'b1] <= {wptr+1'b1, inst2};
+            end
+            else if (!full & !br_bus[32] & inst1_valid) begin
+                valid_inst[waddr] <= 1'b1;
+                dispatch[waddr] <= 1'b0;
+                issue[waddr] <= 1'b0;
+                execute[waddr] <= 1'b0;
+                inst_status[waddr] <= {wptr, inst1};
             end
             else if (!full & !br_bus[32] & inst2_valid) begin
                 valid_inst[waddr] <= 1'b1;
@@ -606,8 +615,8 @@ module scoreboard(
     assign rf_wdata[1] = retire_en[1] ? {cb_extra[raddr+1'b1], cb[raddr+1'b1]} : 64'b0;
 
     reg debug_way;
-    // always @ (posedge clk or negedge clk) begin  // 仿真
-    always @ (posedge clk) begin  // 上板
+    always @ (posedge clk or negedge clk) begin  // 仿真
+    // always @ (posedge clk) begin  // 上板
         if (!resetn) begin
             debug_way <= 1'b0;
         end
@@ -740,6 +749,7 @@ module scoreboard(
         .inst_status (inst_status[iptr[2]]  ),
         .rdata1      (fu_rdata1[2]             ),
         .rdata2      (fu_rdata2[2]             ),
+        .pc_plus_8   (inst_status[iptr[2]+2'd2][`PC]),
         .cb_we       (cb_we[2]              ),
         .rf_we       (rf_we[2]              ),
         .wdata       (wdata[2]              ),
@@ -864,6 +874,7 @@ module scoreboard(
     end
 
     assign br_bus = {br_e_r[raddr]&retire_en[0], {32{retire_en[0]}}&cb_extra[raddr]};
+    assign delayslot_pc = inst_status[raddr+1'b1][`PC];
 
     assign data_sram_en = b_s ? 1'b1 : (retire_en[0] & st_e_r[raddr]) ? 1'b1 : agu_sram_en;
     assign data_sram_wen = b_s ? st_sel_r[raddr+1'b1] : (retire_en[0] & st_e_r[raddr]) ? st_sel_r[raddr] : agu_sram_wen;
