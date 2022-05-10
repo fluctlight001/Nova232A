@@ -873,7 +873,9 @@ module scoreboard(
         end
     end
 
-    assign br_bus = {br_e_r[raddr]&retire_en[0], {32{retire_en[0]}}&cb_extra[raddr]};
+    wire bp_working;
+    assign bp_working = cb_extra[raddr] == inst_status[raddr+2'd2][`PC] ? 1'b1 : 1'b0;
+    assign br_bus = {br_e_r[raddr]&retire_en[0]&~bp_working, {32{retire_en[0]}}&cb_extra[raddr]};
     assign delayslot_pc = inst_status[raddr+1'b1][`PC];
 
     assign data_sram_en = b_s ? 1'b1 : (retire_en[0] & st_e_r[raddr]) ? 1'b1 : agu_sram_en;
