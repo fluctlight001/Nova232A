@@ -75,7 +75,23 @@ module bpu(
         end
     end
 
+    wire jump_err;
+    assign jump_err = br_e & br_target == delayslot_pc+4'd4;
+    reg [20:0] count ;
+    reg [20:0] count1;
+
     always @ (posedge clk) begin
+        if (!resetn) begin
+            count <= 0;
+            count1 <= 0;
+        end
+        if (jump_err) begin
+            count <= count + 1;
+            
+        end
+        if (bp_e) begin
+            count1 <= count1 + 1;
+        end
         if (!resetn) begin
             valid <= 8'b0;
             branch_history_pc[0] <= 32'b0;
