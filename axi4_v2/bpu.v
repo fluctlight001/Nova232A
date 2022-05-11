@@ -82,14 +82,23 @@ module bpu(
             lru[6] <= 1'b0;
         end
         else if (br_e) begin
-            lru <= {lru[3:0],lru[6:4]};    
+            lru <= {lru[5:0],lru[6]};    
         end
     end
 
     wire jump_err;
     assign jump_err = br_e & br_target == delayslot_pc + 4'd4;
 
+    reg [20:0] count1;
+    reg [20:0] count2;
+
     always @ (posedge clk) begin
+        if (!resetn) begin
+            count1 <= 0;
+            count2 <= 0;
+        end
+        if (bp_e) count2 <= count2 + 1;
+        if (jump_err) count1 <= count1 +1; 
         if (!resetn) begin
             valid <= 8'b0;
             branch_history_pc[0] <= 32'b0;
@@ -109,42 +118,42 @@ module bpu(
             branch_target[6] <= 32'b0;
             branch_target[7] <= 32'b0;
         end
-        else if (~jump_err & br_e & ~lru[0] & ~lru[4] & ~lru[6]) begin
+        else if (br_e & ~lru[0] & ~lru[4] & ~lru[6]) begin
             valid[0] <= 1'b1;
             branch_history_pc[0] <= delayslot_pc;
             branch_target[0] <= br_target;
         end
-        else if (~jump_err & br_e & lru[0] & ~lru[4] & ~lru[6]) begin
+        else if (br_e & lru[0] & ~lru[4] & ~lru[6]) begin
             valid[1] <= 1'b1;
             branch_history_pc[1] <= delayslot_pc;
             branch_target[1] <= br_target;
         end
-        else if (~jump_err & br_e & ~lru[1] & lru[4] & ~lru[6]) begin
+        else if (br_e & ~lru[1] & lru[4] & ~lru[6]) begin
             valid[2] <= 1'b1;
             branch_history_pc[2] <= delayslot_pc;
             branch_target[2] <= br_target;
         end
-        else if (~jump_err & br_e & lru[1] & lru[4] & ~lru[6]) begin
+        else if ( br_e & lru[1] & lru[4] & ~lru[6]) begin
             valid[3] <= 1'b1;
             branch_history_pc[3] <= delayslot_pc;
             branch_target[3] <= br_target;
         end
-        else if (~jump_err & br_e & ~lru[2] & ~lru[5] & lru[6]) begin
+        else if ( br_e & ~lru[2] & ~lru[5] & lru[6]) begin
             valid[4] <= 1'b1;
             branch_history_pc[4] <= delayslot_pc;
             branch_target[4] <= br_target;
         end
-        else if (~jump_err & br_e & lru[2] & ~lru[5] & lru[6]) begin
+        else if ( br_e & lru[2] & ~lru[5] & lru[6]) begin
             valid[5] <= 1'b1;
             branch_history_pc[5] <= delayslot_pc;
             branch_target[5] <= br_target;
         end
-        else if (~jump_err & br_e & ~lru[3] & lru[5] & lru[6]) begin
+        else if ( br_e & ~lru[3] & lru[5] & lru[6]) begin
             valid[6] <= 1'b1;
             branch_history_pc[6] <= delayslot_pc;
             branch_target[6] <= br_target;
         end
-        else if (~jump_err & br_e & lru[3] & lru[5] & lru[6]) begin
+        else if ( br_e & lru[3] & lru[5] & lru[6]) begin
             valid[7] <= 1'b1;
             branch_history_pc[7] <= delayslot_pc;
             branch_target[7] <= br_target;

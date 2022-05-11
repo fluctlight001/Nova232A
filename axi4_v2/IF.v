@@ -87,7 +87,13 @@ module IF (
     assign inst_sram_addr = pc_reg;
     assign inst_sram_wdata = 32'b0;
 
-    assign current_pc1 = br_e | r_br_e | bp_e | r_bp_e ? 32'b0 : {next_pc[31:3], 3'b000};
-    assign current_pc2 = br_e | r_br_e | bp_e | r_bp_e ? 32'b0 : {next_pc[31:3], 3'b001};
+    assign current_pc1 = br_e & ~br_addr[2] ? br_addr :
+                        r_br_e & ~r_br_addr[2] ? r_br_addr :
+                        bp_e & ~bp_addr[2] ? bp_addr :
+                        r_bp_e & ~r_bp_addr[2] ? r_bp_addr : {next_pc[31:3], 3'b000};
+    assign current_pc2 = br_e ? {br_addr[31:3], 3'b101} :
+                        r_br_e ? {r_br_addr[31:3], 3'b101} :
+                        bp_e ? {bp_addr[31:3], 3'b101} :
+                        r_bp_e ? {r_bp_addr[31:3], 3'b001} : {next_pc[31:3], 3'b001};
 
 endmodule
