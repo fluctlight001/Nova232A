@@ -7,8 +7,6 @@ module ID (
     input wire [`BR_WD-1:0] br_bus,
     input wire [`BR_WD-1:0] bp_bus,
     input wire next_inst_invalid,    
-    output wire [31:0] current_pc1,
-    output wire [31:0] current_pc2,
     // IF
     input wire [31:0] pc,
     input wire [63:0] inst_sram_rdata,
@@ -53,7 +51,7 @@ module ID (
     end
 
     always @ (posedge clk) begin
-        if (!resetn | br_e | bp_e) begin
+        if (!resetn | br_e) begin
             sram_pc <= 32'b0;
         end
         else if (!stall) begin
@@ -120,6 +118,4 @@ module ID (
     assign inst1_valid = dcd1_valid & easy_match & ~easy_pc[2];
     assign inst2_valid = dcd2_valid & easy_match & ~next_inst_invalid;
 
-    assign current_pc1 = inst1_valid ? {pc_r[31:3], 3'b000} : 32'b0;
-    assign current_pc2 = inst2_valid ? {pc_r[31:3], 3'b100} : 32'b0;
 endmodule

@@ -9,6 +9,9 @@ module IF (
     input wire [`BR_WD-1:0] br_bus,
     input wire [`BR_WD-1:0] bp_bus,
 
+    output wire [31:0] current_pc1,
+    output wire [31:0] current_pc2,
+
     output wire inst_sram_en,
     output wire [3:0] inst_sram_wen,
     output wire [31:0] inst_sram_addr,
@@ -83,5 +86,8 @@ module IF (
     assign inst_sram_wen = 4'b0;
     assign inst_sram_addr = pc_reg;
     assign inst_sram_wdata = 32'b0;
+
+    assign current_pc1 = br_e | r_br_e | bp_e | r_bp_e ? 32'b0 : {next_pc[31:3], 3'b000};
+    assign current_pc2 = br_e | r_br_e | bp_e | r_bp_e ? 32'b0 : {next_pc[31:3], 3'b001};
 
 endmodule

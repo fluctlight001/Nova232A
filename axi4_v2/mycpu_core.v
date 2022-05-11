@@ -28,6 +28,7 @@ module mycpu_core(
     wire [31:0] pc;
     wire [`BR_WD-1:0] br_bus;
     wire [`BR_WD-1:0] bp_bus;
+    wire [`BR_WD-1:0] bp_id_bus;
     wire next_inst_invalid;
     wire [31:0] delayslot_pc;
     wire [31:0] current_pc1, current_pc2;
@@ -54,6 +55,8 @@ module mycpu_core(
         .pc_reg          (pc              ),
         .br_bus          (br_bus          ),
         .bp_bus          (bp_bus          ),
+        .current_pc1     (current_pc1     ),
+        .current_pc2     (current_pc2     ),
         .inst_sram_en    (inst_sram_en    ),
         .inst_sram_wen   (inst_sram_wen   ),
         .inst_sram_addr  (inst_sram_addr_v),
@@ -66,11 +69,8 @@ module mycpu_core(
 
         .stall              (stall              ),
         .br_bus             (br_bus             ),
-        .bp_bus             (bp_bus             ),
+        .bp_bus             (bp_id_bus          ),
         .next_inst_invalid  (next_inst_invalid  ),
-        .current_pc1        (current_pc1        ),
-        .current_pc2        (current_pc2        ),
-
         .pc                 (pc                 ),
         .inst_sram_rdata    (inst_sram_rdata    ),
         .inst1_valid        (inst1_valid        ),
@@ -80,15 +80,18 @@ module mycpu_core(
     );
 
     bpu u_bpu(
-    	.clk               (clk               ),
-        .resetn            (resetn            ),
-        .current_pc1       (current_pc1       ),
-        .current_pc2       (current_pc2       ),
-        .br_bus            (br_bus            ),
-        .delayslot_pc      (delayslot_pc      ),
-        .next_inst_invalid (next_inst_invalid ),
-        .bp_bus            (bp_bus            )
+    	.clk                 (clk                 ),
+        .resetn              (resetn              ),
+        .stall               (stall               ),
+        .current_pc1         (current_pc1         ),
+        .current_pc2         (current_pc2         ),
+        .br_bus              (br_bus              ),
+        .delayslot_pc        (delayslot_pc        ),
+        .bp_bus              (bp_bus              ),
+        .bp_id_bus           (bp_id_bus           ),
+        .rrr_next_inst_invalid(next_inst_invalid   )
     );
+    
     
     
 
