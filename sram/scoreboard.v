@@ -601,8 +601,8 @@ module scoreboard(
     assign rf_wdata[1] = retire_en[1] ? {cb_extra[raddr+1'b1], cb[raddr+1'b1]} : 64'b0;
 
     reg debug_way;
-    // always @ (posedge clk or negedge clk) begin
-    always @ (posedge clk) begin
+    always @ (posedge clk or negedge clk) begin // 仿真
+//    always @ (posedge clk) begin // 上板
         if (!resetn) begin
             debug_way <= 1'b0;
         end
